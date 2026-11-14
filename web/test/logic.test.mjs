@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeDoor, doorRowState, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
+import { describeBanner, ageText, onOff, describeDoor, doorRowState, describeConnectError, connectErrorText, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -240,4 +240,30 @@ test('doorRowState: closed, unknown or offline is plain', () => {
   assert.equal(doorRowState({ online: true, door: 'closed', alert: 'door_open' }), 'none');   // stale alert while it closes
   assert.equal(doorRowState({ online: true, door: undefined, alert: 'none' }), 'none');
   assert.equal(doorRowState({ online: false, door: 'open', alert: 'door_open' }), 'none');
+});
+
+test('describeConnectError: wrong credentials are told apart from a network problem', () => {
+  assert.equal(describeConnectError({ code: 4, message: 'Connection refused: Bad username or password' }), 'auth');
+  assert.equal(describeConnectError({ code: 5 }), 'auth');
+  assert.equal(describeConnectError({ code: 134 }), 'auth');
+  assert.equal(describeConnectError({ code: 135 }), 'auth');
+  assert.equal(describeConnectError({ message: 'Connection refused: Not authorized' }), 'auth');
+  assert.equal(describeConnectError(new Error('Bad User Name or Password')), 'auth');
+});
+test('describeConnectError: anything else is the cloud or the internet', () => {
+  assert.equal(describeConnectError(null), 'network');            // the library reports only a quiet close
+  assert.equal(describeConnectError(undefined, true), 'network');
+  assert.equal(describeConnectError({ message: 'getaddrinfo ENOTFOUND host' }), 'network');
+  assert.equal(describeConnectError({ code: 'ECONNREFUSED' }), 'network');
+});
+test('describeConnectError: no internet on this device wins when it is not a credentials error', () => {
+  assert.equal(describeConnectError(null, false), 'offline');
+  assert.equal(describeConnectError({ message: 'timeout' }, false), 'offline');
+  assert.equal(describeConnectError({ code: 4 }, false), 'auth');   // the broker answered, so we were online
+});
+test('connectErrorText gives a plain sentence for each case', () => {
+  assert.equal(connectErrorText('auth'), 'Login failed. Check your username and password.');
+  assert.match(connectErrorText('network'), /Can.t reach the cloud/);
+  assert.match(connectErrorText('offline'), /No internet connection/);
+  assert.match(connectErrorText('whatever'), /Login failed/);
 });
