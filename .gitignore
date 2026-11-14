@@ -1,0 +1,6 @@
+.pio
+
+include/secrets.h
+
+.superpowers/
+CP210x_Universal_Windows_Driver.zip
