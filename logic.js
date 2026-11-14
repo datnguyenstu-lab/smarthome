@@ -152,13 +152,13 @@ export function formatBuild(stamp) {
   return m ? `${m[1]}, ${m[2]}` : stamp;
 }
 
-// The About details (student name, id, class, year) come from the retained smarthome/about message, so
-// they are not in the public page source. Only the four known text fields are kept, trimmed and cut to 60.
+// The About details (student name, id, class, year, supervisor) come from the retained smarthome/about message, so
+// they are not in the public page source. Only the known text fields are kept, trimmed and cut to 60.
 export function describeAbout(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
   const t = (v) => (typeof v === 'string' ? v.trim().slice(0, 60) : '');
-  const out = { name: t(obj.name), studentId: t(obj.student_id), className: t(obj.class), year: t(obj.year) };
-  return out.name || out.studentId || out.className || out.year ? out : null;
+  const out = { name: t(obj.name), studentId: t(obj.student_id), className: t(obj.class), year: t(obj.year), supervisor: t(obj.supervisor) };
+  return out.name || out.studentId || out.className || out.year || out.supervisor ? out : null;
 }
 
 // The IR sensor is the door sensor. `door` is the retained "open" / "closed" message, `changedSec` the epoch

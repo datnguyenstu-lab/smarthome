@@ -1,6 +1,6 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
   formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor } from './logic.js';
-import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
+import { parseChunk, LogAssembler, requestMessage, buildLogHeader } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
 const APP_VERSION = '2.0.0';  // the page's own release: keep major.minor equal to the board firmware's
@@ -146,7 +146,7 @@ function renderAbout() {
   const who = state.about;  // from the retained smarthome/about message; hidden when it is not published
   $('aStudent').hidden = !who;
   if (who) {
-    for (const [id, v] of [['aName', who.name], ['aId', who.studentId], ['aClass', who.className], ['aYear', who.year]]) {
+    for (const [id, v] of [['aName', who.name], ['aId', who.studentId], ['aClass', who.className], ['aYear', who.year], ['aSupervisor', who.supervisor]]) {
       $(id).textContent = v; $(id).parentElement.hidden = !v;
     }
   }
@@ -292,9 +292,11 @@ async function dlFinish() {
   clearTimeout(dl.timer);
   const text = dl.texts.join('');
   dl = null;
-  let blob = new Blob([text], { type: 'text/plain' }), ext = 'txt';
+  const iso = new Date().toISOString().replace(/[.][0-9]+Z$/, 'Z');
+  const file = buildLogHeader(state.info, iso) + text;   // a short header, then the log lines
+  let blob = new Blob([file], { type: 'text/plain' }), ext = 'txt';
   if (typeof CompressionStream !== 'undefined') {
-    try { blob = await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob(); ext = 'txt.gz'; } catch { /* plain text is fine */ }
+    try { blob = await new Response(new Blob([file]).stream().pipeThrough(new CompressionStream('gzip'))).blob(); ext = 'txt.gz'; } catch { /* plain text is fine */ }
   }
   const d = new Date(), p = (n) => String(n).padStart(2, '0');
   const a = document.createElement('a');
