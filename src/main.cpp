@@ -11,6 +11,7 @@
 #include "settings.h"
 #include "settings_store.h"
 #include "health_monitor.h"
+#include "statusled.h"
 
 using namespace logic;
 
@@ -66,6 +67,16 @@ static void publishPresence(bool changed) {
   if (changed) { char b[16]; snprintf(b, sizeof(b), "%ld", (long)time(nullptr)); pub(T_PRESENCE_CHANGED, b); }
 }
 
+// The yellow LED is Light 3 until something needs attention; then a blink pattern overrides it, and
+// when the pattern ends Light 3 goes back to the state the person set.
+static void driveStatusLed(bool setupMode) {
+  static Pattern prev = Pattern::None;
+  Pattern p = pickPattern(setupMode, net::wifiUp(), net::connected(), healthMonitor::issues(), settings.statusLed);
+  if (p != Pattern::None) leds::drive(3, patternLevel(p, millis()));
+  else if (prev != Pattern::None) leds::drive(3, leds::get(3));
+  prev = p;
+}
+
 static void onConnected() {  // after every (re)connect: republish everything from RAM
   connectMs = millis();
   publishSettings();
@@ -107,6 +118,7 @@ void setup() {
   settings = settingsStore::load();
   applySettings();
   lastTemp = sensors::readTempC();
+  wifiSetup::onTick([]() { driveStatusLed(true); });
   net::onMessage(onCommand);
   net::onConnect(onConnected);
   net::begin();
@@ -127,6 +139,7 @@ void loop() {
   bool p = presenceHold.update(sensors::irDetected(), now);
   if (p != presence) { presence = p; presenceSinceMs = now; publishPresence(true); publishAlertIfChanged(); }
   healthMonitor::tick(now, tempValid(lastTemp), away, presence ? now - presenceSinceMs : 0);
+  driveStatusLed(false);
 
   if (now - lastTempMs >= 30000) { lastTempMs = now; readTemp(); }
 }
