@@ -92,6 +92,8 @@ New look, mobile first, light and dark themes: status header, temperature and pr
 
 ## Constraints
 
+- Update rates (owner decision): temperature and health every 10 s; the temperature is read without blocking the loop. The full self-test stays at boot and on demand: it blocks about 2 to 3 s and shows the yellow pattern, so it does not run every 10 s; the live checks it uses are already part of every health message.
+
 - ESP8266 (RAM 38.7 percent, flash 48.1 percent used today); OTA updates stay working; keep-alive 30 s stays.
 - Logic that can be tested on the PC goes in `lib/logic/` with native Unity tests first (health rules, settings clamp, LED pattern picker). Hardware steps are verified with the board and the cloud watch script.
 - Existing topics and behaviour (`temp`, `presence`, `alert`, `state/*`, `cmd/*`) do not change.

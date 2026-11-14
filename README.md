@@ -5,6 +5,7 @@ A NodeMCU ESP8266 board with a temperature sensor, a presence (IR) sensor, two l
 ## What you get
 
 - **Dashboard:** room temperature on a dial with the heat-alert mark, presence ("Someone there / Nobody there"), two light switches, Away mode.
+- **Live data:** temperature and the board's health refresh every 10 seconds.
 - **Alerts:** too hot (default 35 °C), presence while Away is on, temperature sensor fault.
 - **Health and self-test:** signal, memory, uptime, last restart, problems found, and a self-test you can start from the page.
 - **Settings from the page:** heat threshold, presence hold time, status light on or off. Saved on the board.
