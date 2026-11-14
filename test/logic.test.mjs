@@ -72,14 +72,14 @@ test('guideState offline', () => {
   assert.equal(guideState({ status: undefined, healthTs: 990, nowSec: 1000 }), 'offline');
 });
 test('validateSettings accepts defaults', () => {
-  const r = validateSettings({ hot_on_c: 8, door_open_s: 10, status_led: true });
+  const r = validateSettings({ hot_on_c: 33, door_open_s: 10, status_led: true });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.value, { hot_on_c: 8, door_open_s: 10, status_led: true });
+  assert.deepEqual(r.value, { hot_on_c: 33, door_open_s: 10, status_led: true });
 });
-test('validateSettings warm threshold is -25 to 30', () => {
-  for (const ok of [-25, -18, 0, 8, 30]) assert.equal(validateSettings({ hot_on_c: ok, door_open_s: 10, status_led: true }).ok, true, String(ok));
-  for (const bad of [-26, -30, 31, 40]) assert.equal(validateSettings({ hot_on_c: bad, door_open_s: 10, status_led: true }).ok, false, String(bad));
-  assert.ok(validateSettings({ hot_on_c: 40, door_open_s: 10, status_led: true }).errors.hot_on_c);
+test('validateSettings warm threshold is -25 to 60', () => {
+  for (const ok of [-25, -18, 0, 8, 33, 60]) assert.equal(validateSettings({ hot_on_c: ok, door_open_s: 10, status_led: true }).ok, true, String(ok));
+  for (const bad of [-26, -30, 61, 100]) assert.equal(validateSettings({ hot_on_c: bad, door_open_s: 10, status_led: true }).ok, false, String(bad));
+  assert.ok(validateSettings({ hot_on_c: 61, door_open_s: 10, status_led: true }).errors.hot_on_c);
 });
 test('validateSettings door time is whole seconds 0 to 600', () => {
   for (const ok of [0, 1, 10, 600]) assert.equal(validateSettings({ hot_on_c: 8, door_open_s: ok, status_led: true }).ok, true, String(ok));
@@ -132,13 +132,13 @@ test('resetText names', () => {
   assert.equal(resetText('exception'), 'Crash recovery');
   assert.equal(resetText('whatever'), 'Unknown');
 });
-test('dialFraction clamps to 0..1 over -30..30 (cold storage)', () => {
+test('dialFraction clamps to 0..1 over -30..60 (cold storage)', () => {
   assert.equal(dialFraction(-30), 0);
-  assert.equal(dialFraction(0), 0.5);
-  assert.equal(dialFraction(30), 1);
+  assert.equal(dialFraction(15), 0.5);
+  assert.equal(dialFraction(60), 1);
   assert.equal(dialFraction(-40), 0);
   assert.equal(dialFraction(99), 1);
-  assert.ok(Math.abs(dialFraction(8) - 38 / 60) < 1e-9);
+  assert.ok(Math.abs(dialFraction(33) - 63 / 90) < 1e-9);
   assert.equal(dialFraction(NaN), 0);
   assert.equal(dialFraction(undefined), 0);
 });
