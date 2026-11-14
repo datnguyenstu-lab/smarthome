@@ -10,6 +10,7 @@
 #include "wifi_setup.h"
 #include "settings.h"
 #include "settings_store.h"
+#include "health_monitor.h"
 
 using namespace logic;
 
@@ -18,6 +19,7 @@ static LongPress btn1Long(5000);
 static PresenceHold presenceHold(5000);
 static Settings settings;
 static uint32_t connectMs = 0;
+static uint32_t presenceSinceMs = 0;
 static bool btn1Prev = false, btn2Prev = false;
 static bool presence = false, away = false;
 static float lastTemp = NAN;
@@ -67,6 +69,7 @@ static void publishPresence(bool changed) {
 static void onConnected() {  // after every (re)connect: republish everything from RAM
   connectMs = millis();
   publishSettings();
+  healthMonitor::publishNow();
   for (int n = 1; n <= 3; n++) publishLed(n);
   pub(T_STATE_AWAY, away ? "on" : "off");
   publishPresence(false);
@@ -89,8 +92,9 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
     publishSettings();  // the echo shows what the board really holds
     return;
   }
-  // A retained cmd/setup arrives right after connecting; ignore that so it cannot boot-loop the board.
+  // A retained cmd/setup or cmd/selftest arrives right after connecting; ignore that so it cannot boot-loop the board.
   if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
+  if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(true); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
 }
 
@@ -121,7 +125,8 @@ void loop() {
   if (btn1Long.update(b1, now)) wifiSetup::startPortal();
 
   bool p = presenceHold.update(sensors::irDetected(), now);
-  if (p != presence) { presence = p; publishPresence(true); publishAlertIfChanged(); }
+  if (p != presence) { presence = p; presenceSinceMs = now; publishPresence(true); publishAlertIfChanged(); }
+  healthMonitor::tick(now, tempValid(lastTemp), away, presence ? now - presenceSinceMs : 0);
 
   if (now - lastTempMs >= 30000) { lastTempMs = now; readTemp(); }
 }

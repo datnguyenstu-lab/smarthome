@@ -9,6 +9,7 @@
 #include "ca_cert.h"
 #include "wifi_setup.h"
 #include "topics.h"
+#include "health.h"
 
 namespace net {
 
@@ -18,6 +19,9 @@ static PubSubClient mqtt(tls);
 static MessageCb msgCb = nullptr;
 static void (*connectCb)() = nullptr;
 static uint32_t lastTry = 0;
+static logic::EventWindow reconnects(600000);
+static int wifiRc = 0, mqttRc = 0;
+static bool wifiWasUp = true, everMqtt = false;
 
 static void relay(char* topic, byte* payload, unsigned len) {
   if (!msgCb) return;
@@ -37,6 +41,8 @@ static bool tryConnect() {
     return false;
   }
   Serial.println("MQTT connected");
+  if (everMqtt) { mqttRc++; reconnects.add(millis()); }
+  everMqtt = true;
   mqtt.publish(logic::T_STATUS, "online", true);
   mqtt.subscribe(logic::T_CMD_ALL);
   if (connectCb) connectCb();
@@ -65,11 +71,18 @@ void begin() {
 
 void loop() {
   ArduinoOTA.handle();
+  bool up = WiFi.status() == WL_CONNECTED;
+  if (up && !wifiWasUp) { wifiRc++; reconnects.add(millis()); }
+  wifiWasUp = up;
   if (mqtt.connected()) { mqtt.loop(); return; }
   if (millis() - lastTry >= 5000 || lastTry == 0) { lastTry = millis(); if (WiFi.status() == WL_CONNECTED) tryConnect(); }
 }
 
 bool connected() { return mqtt.connected(); }
+bool wifiUp() { return WiFi.status() == WL_CONNECTED; }
+int wifiReconnects() { return wifiRc; }
+int mqttReconnects() { return mqttRc; }
+int reconnectsIn10Min() { return reconnects.count(millis()); }
 bool publish(const char* topic, const char* payload, bool retained) { return mqtt.connected() && mqtt.publish(topic, payload, retained); }
 void onMessage(MessageCb cb) { msgCb = cb; }
 void onConnect(void (*cb)()) { connectCb = cb; }

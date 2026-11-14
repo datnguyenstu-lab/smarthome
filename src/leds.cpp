@@ -15,6 +15,11 @@ void set(int led, bool on) {
   digitalWrite(PIN_LED[led - 1], on ? HIGH : LOW);
 }
 
+void drive(int led, bool level) {
+  if (led < 1 || led > 3) return;
+  digitalWrite(PIN_LED[led - 1], level ? HIGH : LOW);
+}
+
 bool get(int led) { return led >= 1 && led <= 3 && on_[led - 1]; }
 
 }  // namespace leds
