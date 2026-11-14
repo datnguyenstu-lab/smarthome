@@ -171,3 +171,10 @@ export function describeDoor(door, changedSec, nowSec) {
   if (door !== 'open' && door !== 'closed') return { state: 'unknown', label: 'Door --', since: '' };
   return { state: door, label: door === 'open' ? 'Door open' : 'Door closed', since: changedSec ? ageText(nowSec, changedSec) : '' };
 }
+
+// How the Door row looks: red ('alarm') only once the board itself raises the door or lock-up alert, which
+// happens after the grace time; an open door before that is only 'watch' (outlined); everything else 'none'.
+export function doorRowState({ online, door, alert }) {
+  if (!online || door !== 'open') return 'none';
+  return alert === 'door_open' || alert === 'intruder' ? 'alarm' : 'watch';
+}

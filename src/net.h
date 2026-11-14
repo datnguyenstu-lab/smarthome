@@ -7,6 +7,7 @@ using MessageCb = void (*)(const char* topic, const char* payload, unsigned len)
 void begin();                              // Wi-Fi, NTP time, TLS and OTA setup; restarts on failure
 void loop();                               // keeps MQTT up (5 s retry), handles OTA and messages
 bool connected();
+void goOffline();                           // say goodbye to the broker at once (status offline), then disconnect
 bool wifiUp();                             // Wi-Fi link is up (MQTT may still be down)
 int wifiReconnects();                      // Wi-Fi links regained since boot
 int mqttReconnects();                      // MQTT connects after the first since boot

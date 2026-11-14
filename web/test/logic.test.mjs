@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeDoor, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
+import { describeBanner, ageText, onOff, describeDoor, doorRowState, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -225,4 +225,19 @@ test('describeDoor open, closed and unknown', () => {
   assert.deepEqual(describeDoor('closed', undefined, 1000), { state: 'closed', label: 'Door closed', since: '' });
   assert.deepEqual(describeDoor(undefined, 700, 1000), { state: 'unknown', label: 'Door --', since: '' });
   assert.deepEqual(describeDoor('banana', 700, 1000), { state: 'unknown', label: 'Door --', since: '' });
+});
+
+test('doorRowState: red only when the board raises the door or lock-up alert', () => {
+  assert.equal(doorRowState({ online: true, door: 'open', alert: 'door_open' }), 'alarm');
+  assert.equal(doorRowState({ online: true, door: 'open', alert: 'intruder' }), 'alarm');
+});
+test('doorRowState: an open door inside the grace time is only watched, not red', () => {
+  assert.equal(doorRowState({ online: true, door: 'open', alert: 'none' }), 'watch');
+  assert.equal(doorRowState({ online: true, door: 'open', alert: 'hot' }), 'watch');
+});
+test('doorRowState: closed, unknown or offline is plain', () => {
+  assert.equal(doorRowState({ online: true, door: 'closed', alert: 'none' }), 'none');
+  assert.equal(doorRowState({ online: true, door: 'closed', alert: 'door_open' }), 'none');   // stale alert while it closes
+  assert.equal(doorRowState({ online: true, door: undefined, alert: 'none' }), 'none');
+  assert.equal(doorRowState({ online: false, door: 'open', alert: 'door_open' }), 'none');
 });

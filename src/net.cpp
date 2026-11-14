@@ -92,6 +92,18 @@ void loop() {
 }
 
 bool connected() { return mqtt.connected(); }
+
+// Before the board leaves for setup mode it stops answering MQTT. Without this the broker only notices after the
+// keep-alive runs out (45 to 60 s) and the page keeps showing "online". A clean disconnect does not trigger the
+// last will, so the retained status is set here.
+void goOffline() {
+  if (mqtt.connected()) {
+    mqtt.publish(logic::T_STATUS, "offline", true);   // written out at once; no mqtt.loop() here: we may be inside its callback
+    mqtt.disconnect();
+    delay(100);   // let the packets leave before the portal takes over
+  }
+  mqttWasUp = false;
+}
 bool wifiUp() { return WiFi.status() == WL_CONNECTED; }
 int wifiReconnects() { return wifiRc; }
 int mqttReconnects() { return mqttRc; }

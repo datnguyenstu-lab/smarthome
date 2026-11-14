@@ -49,6 +49,12 @@ static void publishAlertIfChanged(bool force = false) {
   if (a != alert || force) { alert = a; pub(T_ALERT, alertName(a)); }
 }
 
+// Setup mode and "forget Wi-Fi" take the board off the cloud for minutes: tell the broker first.
+static void enterSetup(bool forgetNetwork) {
+  net::goOffline();
+  if (forgetNetwork) wifiSetup::forgetAndSetup(); else wifiSetup::startPortal();
+}
+
 static void setLed(int n, bool on) { leds::set(n, on); publishLed(n); }
 
 static void setAway(bool on) {
@@ -114,8 +120,8 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
     return;
   }
   // A retained cmd/setup or cmd/selftest arrives right after connecting; ignore that so it cannot boot-loop the board.
-  if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
-  if (strcmp(topic, T_CMD_FORGET_WIFI) == 0) { if (millis() - connectMs > 3000) wifiSetup::forgetAndSetup(); return; }
+  if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) enterSetup(false); return; }
+  if (strcmp(topic, T_CMD_FORGET_WIFI) == 0) { if (millis() - connectMs > 3000) enterSetup(true); return; }
   if (strcmp(topic, T_CMD_LOG) == 0) { if (millis() - connectMs > 3000) eventLog::handleCommand(payload, len); return; }
   if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(3000); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
@@ -153,7 +159,7 @@ void loop() {
   if (b1 && !btn1Prev) setLed(2, !leds::get(2));  // D1 button -> middle light (main storage)
   if (b2 && !btn2Prev) setLed(3, !leds::get(3));  // D4 button -> right light (secondary storage)
   btn1Prev = b1; btn2Prev = b2;
-  if (btn1Long.update(b1, now)) wifiSetup::startPortal();
+  if (btn1Long.update(b1, now)) enterSetup(false);
 
   // IR sees the door (closed) -> detected; sees nothing -> the door is open
   bool open = doorDebounce.update(!sensors::irDetected(), now);
