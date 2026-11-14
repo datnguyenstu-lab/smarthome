@@ -15,6 +15,9 @@ constexpr const char* T_SETTINGS = "smarthome/settings";
 constexpr const char* T_CMD_SETTINGS = "smarthome/cmd/settings";
 constexpr const char* T_CMD_SELFTEST = "smarthome/cmd/selftest";
 constexpr const char* T_CMD_SETUP = "smarthome/cmd/setup";
+constexpr const char* T_CMD_LOG = "smarthome/cmd/log";
+constexpr const char* T_LOG_INDEX = "smarthome/log/index";
+constexpr const char* T_LOG_DATA = "smarthome/log/data";
 
 // Exact lowercase "on" / "off" only. `on` is left untouched when parsing fails.
 bool parseOnOff(const char* payload, unsigned len, bool& on);
