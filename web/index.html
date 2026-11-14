@@ -11,22 +11,25 @@
 <body>
 <main>
   <section id="login">
-    <span class="logotile"><img src="assets/vetc-logo.png" alt="School logo" width="64" height="64"></span>
-    <h1>Cold Storage Monitor</h1>
-    <p class="sub left">School project</p>
+    <span class="logotile"><img src="assets/vetc-logo.png" alt="School logo" data-i18n-attr="alt" width="64" height="64"></span>
+    <h1 data-i18n>Cold Storage Monitor</h1>
+    <p class="sub left" data-i18n>School project</p>
     <form id="loginForm">
-      <input id="user" placeholder="Username" autocomplete="username" required>
-      <input id="pass" type="password" placeholder="Password" autocomplete="current-password" required>
+      <input id="user" placeholder="Username" data-i18n-attr="placeholder" autocomplete="username" required>
+      <input id="pass" type="password" placeholder="Password" data-i18n-attr="placeholder" autocomplete="current-password" required>
       <p id="loginError" class="error-text" role="alert"></p>
-      <button class="btn" id="loginBtn" type="submit">Connect</button>
+      <button class="btn" id="loginBtn" type="submit" data-i18n>Connect</button>
     </form>
+    <div class="lang" role="group" aria-label="Language" data-i18n-attr="aria-label">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button><button type="button" data-lang="vi" aria-pressed="false">VI</button>
+    </div>
   </section>
 
   <section id="app" hidden>
     <div id="connBar" class="connbar" role="status" hidden></div>
     <!-- Home -->
     <div id="viewHome">
-      <div class="top"><span>Cold storage</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
+      <div class="top"><span data-i18n>Cold storage</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
       <div id="alerts"></div>
       <div class="dial">
         <svg viewBox="0 0 240 135" aria-hidden="true">
@@ -37,109 +40,113 @@
         </svg>
         <div class="num"><span id="temp">--</span><small>°C</small></div>
       </div>
-      <div class="sub">Storage temperature</div>
+      <div class="sub" data-i18n>Storage temperature</div>
       <div class="row" id="doorRow"><span id="door">--</span><span class="m" id="age"></span></div>
       <div class="lamps" id="lamps">
         <button class="lamp" data-led="2" aria-pressed="false"><b></b><span class="lname"></span></button>
         <button class="lamp" data-led="3" aria-pressed="false"><b></b><span class="lname"></span></button>
       </div>
-      <div class="row"><span id="awayLabel">Lock-up mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
-      <button class="row navrow" id="guideLink" data-go="guide" hidden><span>Board offline: reconnect guide</span><span class="m">›</span></button>
+      <div class="row"><span id="awayLabel" data-i18n>Lock-up mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
+      <button class="row navrow" id="guideLink" data-go="guide" hidden><span data-i18n>Board offline: reconnect guide</span><span class="m">›</span></button>
       <button class="row navrow" data-go="health"><span id="healthLine">Health</span><span class="m">›</span></button>
-      <button class="row navrow" data-go="settings"><span>Settings</span><span class="m">›</span></button>
-      <button class="foot" data-go="about" aria-label="About this software">
+      <button class="row navrow" data-go="settings"><span data-i18n>Settings</span><span class="m">›</span></button>
+      <button class="foot" data-go="about" aria-label="About this software" data-i18n-attr="aria-label">
         <img src="assets/vetc-logo.png" alt="" width="24" height="24">
-        <span id="footVersions">Cold Storage Monitor</span><span class="m">About ›</span>
+        <span id="footVersions">Cold Storage Monitor</span><span class="m" data-i18n>About ›</span>
       </button>
     </div>
 
     <!-- Health -->
     <div id="viewHealth" hidden>
-      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Health</span></div>
-      <h5>Connection</h5>
-      <div class="row"><span>Wi-Fi signal</span><span class="m" id="hSignal">--</span></div>
-      <div class="row"><span>Cloud link</span><span class="m" id="hCloud">--</span></div>
-      <h5>Board</h5>
-      <div class="row"><span>Free memory</span><span class="m" id="hMem">--</span></div>
-      <div class="row"><span>Running for</span><span class="m" id="hUp">--</span></div>
-      <div class="row"><span>Last restart</span><span class="m" id="hReset">--</span></div>
-      <div class="row"><span>Firmware</span><span class="m" id="hFw">--</span></div>
-      <h5>Problems</h5>
+      <div class="top"><button class="linkbtn" data-go="home" data-i18n>‹ Home</button><span data-i18n>Health</span></div>
+      <h5 data-i18n>Connection</h5>
+      <div class="row"><span data-i18n>Wi-Fi signal</span><span class="m" id="hSignal">--</span></div>
+      <div class="row"><span data-i18n>Cloud link</span><span class="m" id="hCloud">--</span></div>
+      <h5 data-i18n>Board</h5>
+      <div class="row"><span data-i18n>Free memory</span><span class="m" id="hMem">--</span></div>
+      <div class="row"><span data-i18n>Running for</span><span class="m" id="hUp">--</span></div>
+      <div class="row"><span data-i18n>Last restart</span><span class="m" id="hReset">--</span></div>
+      <div class="row"><span data-i18n>Firmware</span><span class="m" id="hFw">--</span></div>
+      <h5 data-i18n>Problems</h5>
       <div id="hIssues"></div>
-      <div class="row"><span>Self-test</span><span class="m" id="hSelf">not run yet</span></div>
-      <button class="btn" id="runSelf">Run self-test</button>
-      <p class="note" id="selfNote">The yellow light on the board shows a pattern while the test runs.</p>
+      <div class="row"><span data-i18n>Self-test</span><span class="m" id="hSelf">not run yet</span></div>
+      <button class="btn" id="runSelf" data-i18n>Run self-test</button>
+      <p class="note" id="selfNote"></p>
       <button class="btn ghost" id="dlLog">Download log</button>
-      <p class="note" id="dlNote">Saves what the board has recorded: restarts, Wi-Fi drops, problems and setting changes.</p>
+      <p class="note" id="dlNote"></p>
     </div>
 
     <!-- Settings -->
     <div id="viewSettings" hidden>
-      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Settings</span></div>
-      <h5>Temperature alert</h5>
-      <div class="row"><label for="sHot">Warn me above</label>
-        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="-25" max="60" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
+      <div class="top"><button class="linkbtn" data-go="home" data-i18n>‹ Home</button><span data-i18n>Settings</span></div>
+      <h5 data-i18n>Temperature alert</h5>
+      <div class="row"><label for="sHot" data-i18n>Warn me above</label>
+        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower" data-i18n-attr="aria-label">−</button><input id="sHot" type="number" inputmode="decimal" min="-25" max="60" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise" data-i18n-attr="aria-label">+</button></span></div>
       <p class="note bad" id="eHot"></p>
-      <h5>Door</h5>
-      <div class="row"><label for="sDoor">Warn me when the door stays open for</label>
-        <span class="stepper"><button data-step="sDoor" data-d="-5" aria-label="Shorter">−</button><input id="sDoor" type="number" inputmode="numeric" min="0" max="600" step="1"><span>s</span><button data-step="sDoor" data-d="5" aria-label="Longer">+</button></span></div>
+      <h5 data-i18n>Door</h5>
+      <div class="row"><label for="sDoor" data-i18n>Warn me when the door stays open for</label>
+        <span class="stepper"><button data-step="sDoor" data-d="-5" aria-label="Shorter" data-i18n-attr="aria-label">−</button><input id="sDoor" type="number" inputmode="numeric" min="0" max="600" step="1"><span>s</span><button data-step="sDoor" data-d="5" aria-label="Longer" data-i18n-attr="aria-label">+</button></span></div>
       <p class="note bad" id="eDoor"></p>
-      <h5>Board light</h5>
-      <div class="row"><span id="sLedLabel">Yellow light shows problems</span><button class="tg" id="sLed" role="switch" aria-checked="true" aria-labelledby="sLedLabel"></button></div>
+      <h5 data-i18n>Board light</h5>
+      <div class="row"><span id="sLedLabel" data-i18n>Yellow light shows problems</span><button class="tg" id="sLed" role="switch" aria-checked="true" aria-labelledby="sLedLabel"></button></div>
       <p class="note" id="sNote"></p>
-      <button class="btn" id="sSave">Save settings</button>
-      <button class="btn ghost" id="sReset">Reset to defaults</button>
-      <p class="note">Temperature alert: -25 to 60 °C. Door time: 0 to 600 seconds (0 warns at once). In lock-up mode an open door raises the alarm at once. The board checks every value.</p>
+      <button class="btn" id="sSave" data-i18n>Save settings</button>
+      <button class="btn ghost" id="sReset" data-i18n>Reset to defaults</button>
+      <p class="note" data-i18n>Temperature alert: -25 to 60 °C. Door time: 0 to 600 seconds (0 warns at once). In lock-up mode an open door raises the alarm at once. The board checks every value.</p>
+      <h5 data-i18n>Language</h5>
+      <div class="lang" role="group" aria-label="Language" data-i18n-attr="aria-label">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button><button type="button" data-lang="vi" aria-pressed="false">VI</button>
+      </div>
       <h5>Wi-Fi</h5>
-      <button class="btn ghost" id="setupBtn">Restart into setup mode</button>
-      <p class="note">Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>
-      <button class="btn ghost danger" id="forgetBtn">Forget Wi-Fi password</button>
-      <p class="note">Erases the saved network and its password, then opens setup mode. The board stays offline until you choose a network again.</p>
+      <button class="btn ghost" id="setupBtn" data-i18n>Restart into setup mode</button>
+      <p class="note" data-i18n>Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>
+      <button class="btn ghost danger" id="forgetBtn" data-i18n>Forget Wi-Fi password</button>
+      <p class="note" data-i18n>Erases the saved network and its password, then opens setup mode. The board stays offline until you choose a network again.</p>
     </div>
 
     <!-- About -->
     <div id="viewAbout" hidden>
-      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>About</span></div>
+      <div class="top"><button class="linkbtn" data-go="home" data-i18n>‹ Home</button><span data-i18n>About</span></div>
       <div class="aboutbrand">
-        <span class="logotile big"><img src="assets/vetc-logo.png" alt="School logo" width="72" height="72"></span>
-        <div><b>Cold Storage Monitor</b><span class="sub left">School project · <a href="https://vetc.edu.vn/" target="_blank" rel="noopener">vetc.edu.vn</a></span></div>
+        <span class="logotile big"><img src="assets/vetc-logo.png" alt="School logo" data-i18n-attr="alt" width="72" height="72"></span>
+        <div><b data-i18n>Cold Storage Monitor</b><span class="sub left"><span data-i18n>School project</span> · <a href="https://vetc.edu.vn/" target="_blank" rel="noopener">vetc.edu.vn</a></span></div>
       </div>
       <div id="aStudent" hidden>
-        <h5>Student</h5>
-        <div class="row"><span>Name</span><span class="m" id="aName"></span></div>
-        <div class="row"><span>Student ID</span><span class="m" id="aId"></span></div>
-        <div class="row"><span>Class</span><span class="m" id="aClass"></span></div>
-        <div class="row"><span>School year</span><span class="m" id="aYear"></span></div>
-        <div class="row"><span>Supervisor</span><span class="m" id="aSupervisor"></span></div>
+        <h5 data-i18n>Student</h5>
+        <div class="row"><span data-i18n>Name</span><span class="m" id="aName"></span></div>
+        <div class="row"><span data-i18n>Student ID</span><span class="m" id="aId"></span></div>
+        <div class="row"><span data-i18n>Class</span><span class="m" id="aClass"></span></div>
+        <div class="row"><span data-i18n>School year</span><span class="m" id="aYear"></span></div>
+        <div class="row"><span data-i18n>Supervisor</span><span class="m" id="aSupervisor"></span></div>
       </div>
       <div id="vCompat"></div>
-      <h5>Software</h5>
-      <div class="row"><span>Page version</span><span class="m" id="aPage">--</span></div>
-      <div class="row"><span>Board firmware</span><span class="m" id="aFw">--</span></div>
-      <div class="row"><span>Firmware built</span><span class="m" id="aBuild">--</span></div>
-      <h5>Board</h5>
-      <div class="row"><span>Chip</span><span class="m" id="aChip">--</span></div>
-      <div class="row"><span>Platform core</span><span class="m" id="aCore">--</span></div>
-      <div class="row"><span>Flash memory</span><span class="m" id="aFlash">--</span></div>
-      <div class="row"><span>Firmware size</span><span class="m" id="aSketch">--</span></div>
-      <h5>Project</h5>
-      <div class="row"><span>Source code</span><span class="m"><a href="https://github.com/datnguyenstu-lab/smarthome" target="_blank" rel="noopener">GitHub</a></span></div>
-      <p class="note">Updates reach the board from a computer on its network; the page cannot change the firmware.</p>
+      <h5 data-i18n>Software</h5>
+      <div class="row"><span data-i18n>Page version</span><span class="m" id="aPage">--</span></div>
+      <div class="row"><span data-i18n>Board firmware</span><span class="m" id="aFw">--</span></div>
+      <div class="row"><span data-i18n>Firmware built</span><span class="m" id="aBuild">--</span></div>
+      <h5 data-i18n>Board</h5>
+      <div class="row"><span data-i18n>Chip</span><span class="m" id="aChip">--</span></div>
+      <div class="row"><span data-i18n>Platform core</span><span class="m" id="aCore">--</span></div>
+      <div class="row"><span data-i18n>Flash memory</span><span class="m" id="aFlash">--</span></div>
+      <div class="row"><span data-i18n>Firmware size</span><span class="m" id="aSketch">--</span></div>
+      <h5 data-i18n>Project</h5>
+      <div class="row"><span data-i18n>Source code</span><span class="m"><a href="https://github.com/datnguyenstu-lab/smarthome" target="_blank" rel="noopener">GitHub</a></span></div>
+      <p class="note" data-i18n>Updates reach the board from a computer on its network; the page cannot change the firmware.</p>
     </div>
 
     <!-- Reconnect guide -->
     <div id="viewGuide" hidden>
-      <div class="top"><span>Home</span><span class="status"><i></i><span id="gStatus">Offline</span></span></div>
-      <div id="gOk" class="ok-banner" hidden>Back online</div>
+      <div class="top"><span data-i18n>Home</span><span class="status"><i></i><span id="gStatus">Offline</span></span></div>
+      <div id="gOk" class="ok-banner" data-i18n hidden>Back online</div>
       <div id="gSteps">
-        <div class="alertb"><b id="gTitle">The board isn't answering</b><span id="gSeen"></span></div>
-        <div class="step"><em>1</em><span>Is it powered?<small>Check the USB cable and that a light is on.</small></span></div>
-        <div class="step now"><em>2</em><span>Did the Wi-Fi change?<small>A new router or password means the board can't join.</small></span></div>
-        <div class="step"><em>3</em><span>Hold the left button (D1) for 5 seconds<small>The yellow light blinks fast: setup mode.</small></span></div>
-        <div class="step"><em>4</em><span>On your phone, join "SmartHome-Setup"<small>Choose your Wi-Fi and enter its password.</small></span></div>
-        <div class="step"><em>5</em><span>Wait here<small>This page tells you when the board is back.</small></span></div>
+        <div class="alertb"><b id="gTitle"></b><span id="gSeen"></span></div>
+        <div class="step"><em>1</em><span><span data-i18n>Is it powered?</span><small data-i18n>Check the USB cable and that a light is on.</small></span></div>
+        <div class="step now"><em>2</em><span><span data-i18n>Did the Wi-Fi change?</span><small data-i18n>A new router or password means the board can't join.</small></span></div>
+        <div class="step"><em>3</em><span><span data-i18n>Hold the left button (D1) for 5 seconds</span><small data-i18n>The yellow light blinks fast: setup mode.</small></span></div>
+        <div class="step"><em>4</em><span><span data-i18n>On your phone, join "SmartHome-Setup"</span><small data-i18n>Choose your Wi-Fi and enter its password.</small></span></div>
+        <div class="step"><em>5</em><span><span data-i18n>Wait here</span><small data-i18n>This page tells you when the board is back.</small></span></div>
       </div>
-      <button class="btn ghost" id="gBack">Back to the dashboard</button>
+      <button class="btn ghost" id="gBack" data-i18n>Back to the dashboard</button>
     </div>
   </section>
 </main>

@@ -5,6 +5,7 @@ A NodeMCU ESP8266 board that watches a cold storage room: a temperature sensor, 
 ## What you get
 
 - **Dashboard:** storage temperature on a dial with the alert mark, door status (open or closed, and since when), two light switches (**Main storage**, **Secondary storage**) and Lock-up mode.
+- **English and Vietnamese:** an EN | VI switch on the login screen and in Settings. The page starts in the browser's language and remembers your choice. Texts live in `web/i18n.js` (the English text is the key); a test fails if any text on the page has no Vietnamese translation.
 - **Live data:** temperature and the board's health refresh every 10 seconds.
 - **Alerts:** door open too long (default 10 s), temperature too warm (default 33 °C), door opened while Lock-up mode is on (at once), temperature sensor fault. One alert at a time, in that order of priority.
 - **Health and self-test:** signal, memory, uptime, last restart, problems found, and a self-test you can start from the page.
