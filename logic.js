@@ -178,3 +178,19 @@ export function doorRowState({ online, door, alert }) {
   if (!online || door !== 'open') return 'none';
   return alert === 'door_open' || alert === 'intruder' ? 'alarm' : 'watch';
 }
+
+// Why a connection failed: the broker refused the login ('auth'), this device has no internet ('offline'), or the
+// cloud could not be reached ('network'). The MQTT library reports a wrong password as an error with code 4
+// (or 5, 134, 135) and a network failure only as a quiet close, so no error at all means 'network'.
+export function describeConnectError(err, online = true) {
+  const code = Number(err?.code);
+  const msg = String(err?.message ?? '');
+  if ([4, 5, 134, 135].includes(code) || /not authori[sz]ed|bad user|username or password|bad credentials/i.test(msg)) return 'auth';
+  return online === false ? 'offline' : 'network';
+}
+
+export function connectErrorText(kind) {
+  if (kind === 'network') return "Can't reach the cloud. Check the internet connection and try again.";
+  if (kind === 'offline') return 'No internet connection. Connect to the internet and try again.';
+  return 'Login failed. Check your username and password.';
+}

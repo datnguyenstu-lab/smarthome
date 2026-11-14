@@ -1,5 +1,5 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
-  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor, doorRowState } from './logic.js';
+  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor, doorRowState, describeConnectError, connectErrorText } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage, buildLogHeader } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
@@ -68,8 +68,7 @@ function renderHome() {
   const issues = online ? describeIssues(state.health?.issues) : [];
   const box = $('alerts');
   box.replaceChildren();
-  if (!connected) box.append(alertBlock('Reconnecting…', '', 'warn'));
-  else if (online) {
+  if (online) {
     const b = describeBanner({ alert: state.alert, status: state.status });
     const covered = state.alert === 'temp_fault' && issues.some((i) => i.code === 'temp_fault');
     if (b.level !== 'ok' && !covered) box.append(alertBlock(b.text, '', b.level === 'warn' ? 'warn' : ''));
@@ -159,7 +158,14 @@ function renderAbout() {
   else box.append(alertBlock(v.level === 'warn' ? 'Versions differ' : 'Version unknown', v.text, v.level === 'warn' ? '' : 'warn'));
 }
 
-function render() { renderHome(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
+// Shown on every screen while the page has lost its connection to the cloud (the board may still be fine).
+function renderConnBar() {
+  const bar = $('connBar');
+  bar.hidden = connected;
+  if (!connected) bar.textContent = navigator.onLine === false ? 'No internet connection. Reconnecting…' : 'Connection to the cloud lost. Reconnecting…';
+}
+
+function render() { renderConnBar(); renderHome(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
 
 function handle(topic, buf, packet) {
   const v = buf.toString();
@@ -198,14 +204,18 @@ function connect(username, password) {
     render();
   });
   client.on('message', (topic, buf, packet) => handle(topic, buf, packet));
-  client.on('error', (e) => { if (!everConnected) fail(e); });
-  client.on('close', () => { connected = false; if (everConnected) { ready = false; state.status = undefined; state.healthLiveAt = undefined; render(); } });
-  setTimeout(() => { if (!everConnected) fail(); }, 12000);
+  client.on('error', (e) => { if (!everConnected) fail(describeConnectError(e, navigator.onLine)); });
+  client.on('close', () => {
+    connected = false;
+    if (everConnected) { ready = false; state.status = undefined; state.healthLiveAt = undefined; render(); }
+    else if (client) fail(describeConnectError(null, navigator.onLine));   // closed before it ever connected: no network
+  });
+  setTimeout(() => { if (!everConnected && client) fail(describeConnectError(null, navigator.onLine)); }, 12000);
 }
 
-function fail() {
+function fail(kind) {
   if (client) { client.end(true); client = null; }
-  $('loginError').textContent = 'Login failed. Check your username and password.';
+  $('loginError').textContent = connectErrorText(kind);
   $('loginBtn').disabled = false;
 }
 
@@ -321,4 +331,6 @@ $('dlLog').addEventListener('click', () => {
   render();
 });
 
+window.addEventListener('online', () => { if (!$('app').hidden) render(); });
+window.addEventListener('offline', () => { if (!$('app').hidden) render(); });
 setInterval(() => { if (!$('app').hidden) render(); }, 10000);
