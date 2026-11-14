@@ -3,138 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Smart Home</title>
-<style>
-  :root { --bg:#f4f6f8; --card:#fff; --text:#111827; --muted:#6b7280; --ok:#16a34a; --warn:#b45309; --warnbg:#fef3c7; --err:#b91c1c; --errbg:#fee2e2; --on:#16a34a; --line:#e5e7eb; --accent:#2563eb; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0b1220; --card:#1f2937; --text:#f3f4f6; --muted:#9ca3af; --ok:#34d399; --warn:#fcd34d; --warnbg:#78350f; --err:#fecaca; --errbg:#7f1d1d; --on:#34d399; --line:#374151; --accent:#60a5fa; } }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.4 system-ui,sans-serif; }
-  main { max-width:420px; margin:0 auto; padding:16px; }
-  h1 { font-size:18px; margin:0; }
-  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
-  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--muted); margin-right:6px; }
-  .dot.online { background:var(--ok); }
-  .card { background:var(--card); border-radius:14px; padding:14px; margin-bottom:12px; border:1px solid var(--line); }
-  .banner { border-radius:12px; padding:10px 12px; margin-bottom:12px; font-weight:600; }
-  .banner.warn { background:var(--warnbg); color:var(--warn); }
-  .banner.error { background:var(--errbg); color:var(--err); }
-  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
-  .tiles .card { margin:0; }
-  .label { color:var(--muted); font-size:13px; }
-  .big { font-size:28px; font-weight:600; }
-  .row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); }
-  .row:last-child { border-bottom:0; }
-  .sw { appearance:none; width:50px; height:28px; border-radius:14px; background:var(--muted); position:relative; cursor:pointer; border:0; }
-  .sw::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; transition:left .15s; }
-  .sw.on { background:var(--on); } .sw.on::after { left:25px; }
-  .sw:disabled { opacity:.4; cursor:not-allowed; }
-  form { display:grid; gap:10px; }
-  input { font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
-  button.primary { font:inherit; padding:10px; border-radius:10px; border:0; background:var(--accent); color:#fff; font-weight:600; }
-  .error-text { color:var(--err); min-height:1.4em; margin:0; }
-  [hidden] { display:none !important; }
-</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=Manrope:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
 <main>
-  <section id="login" class="card">
+  <section id="login">
     <h1>Smart Home</h1>
     <form id="loginForm">
       <input id="user" placeholder="Username" autocomplete="username" required>
       <input id="pass" type="password" placeholder="Password" autocomplete="current-password" required>
       <p id="loginError" class="error-text" role="alert"></p>
-      <button class="primary" id="loginBtn" type="submit">Connect</button>
+      <button class="btn" id="loginBtn" type="submit">Connect</button>
     </form>
   </section>
 
   <section id="app" hidden>
-    <header><h1>Smart Home</h1><span><span id="dot" class="dot"></span><span id="statusText">offline</span></span></header>
-    <div id="banner" class="banner" hidden></div>
-    <div class="tiles">
-      <div class="card"><div class="label">Temperature</div><div id="temp" class="big">--</div></div>
-      <div class="card"><div class="label">Presence</div><div id="presence" class="big">--</div><div id="age" class="label"></div></div>
+    <!-- Home -->
+    <div id="viewHome">
+      <div class="top"><span>Home</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
+      <div id="alerts"></div>
+      <div class="dial">
+        <svg viewBox="0 0 240 135" aria-hidden="true">
+          <path d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--surf)" stroke-width="14" stroke-linecap="round"/>
+          <path id="arc" d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--ok)" stroke-width="14" stroke-linecap="round" stroke-dasharray="0 400"/>
+          <line id="hotTick" x1="0" y1="0" x2="0" y2="0" stroke="var(--bad)" stroke-width="3"/>
+          <text id="hotLabel" x="0" y="0" fill="var(--bad)" font-size="9" font-weight="700" text-anchor="middle"></text>
+        </svg>
+        <div class="num"><span id="temp">--</span><small>°C</small></div>
+      </div>
+      <div class="sub">Room temperature</div>
+      <div class="row"><span id="presence">--</span><span class="m" id="age"></span></div>
+      <div class="lamps" id="lamps">
+        <button class="lamp" data-led="2" aria-pressed="false"><b></b><span class="lname"></span></button>
+        <button class="lamp" data-led="3" aria-pressed="false"><b></b><span class="lname"></span></button>
+      </div>
+      <div class="row"><span id="awayLabel">Away mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
+      <button class="row navrow" id="guideLink" data-go="guide" hidden><span>Board offline: reconnect guide</span><span class="m">›</span></button>
+      <button class="row navrow" data-go="health"><span id="healthLine">Health</span><span class="m">›</span></button>
+      <button class="row navrow" data-go="settings"><span>Settings</span><span class="m">›</span></button>
     </div>
-    <div class="card" id="switches">
-      <div class="row"><span>Light 2</span><button class="sw" data-led="2" aria-label="Light 2"></button></div>
-      <div class="row"><span>Light 3</span><button class="sw" data-led="3" aria-label="Light 3"></button></div>
-      <div class="row"><span>Away mode</span><button class="sw" id="away" aria-label="Away mode"></button></div>
+
+    <!-- Health -->
+    <div id="viewHealth" hidden>
+      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Health</span></div>
+      <h5>Connection</h5>
+      <div class="row"><span>Wi-Fi signal</span><span class="m" id="hSignal">--</span></div>
+      <div class="row"><span>Cloud link</span><span class="m" id="hCloud">--</span></div>
+      <h5>Board</h5>
+      <div class="row"><span>Free memory</span><span class="m" id="hMem">--</span></div>
+      <div class="row"><span>Running for</span><span class="m" id="hUp">--</span></div>
+      <div class="row"><span>Last restart</span><span class="m" id="hReset">--</span></div>
+      <h5>Problems</h5>
+      <div id="hIssues"></div>
+      <div class="row"><span>Self-test</span><span class="m" id="hSelf">not run yet</span></div>
+      <button class="btn" id="runSelf">Run self-test</button>
+      <p class="note" id="selfNote">The yellow light on the board shows a pattern while the test runs.</p>
+    </div>
+
+    <!-- Settings -->
+    <div id="viewSettings" hidden>
+      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Settings</span></div>
+      <h5>Heat alert</h5>
+      <div class="row"><label for="sHot">Warn me above</label>
+        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="20" max="60" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
+      <p class="note bad" id="eHot"></p>
+      <h5>Presence sensor</h5>
+      <div class="row"><label for="sHold">Keep "someone there" for</label>
+        <span class="stepper"><button data-step="sHold" data-d="-1" aria-label="Shorter">−</button><input id="sHold" type="number" inputmode="numeric" min="1" max="60" step="1"><span>s</span><button data-step="sHold" data-d="1" aria-label="Longer">+</button></span></div>
+      <p class="note bad" id="eHold"></p>
+      <h5>Board light</h5>
+      <div class="row"><span id="sLedLabel">Yellow light shows problems</span><button class="tg" id="sLed" role="switch" aria-checked="true" aria-labelledby="sLedLabel"></button></div>
+      <p class="note" id="sNote"></p>
+      <button class="btn" id="sSave">Save settings</button>
+      <button class="btn ghost" id="sReset">Reset to defaults</button>
+      <p class="note">Heat alert: 20 to 60 °C. Presence hold: 1 to 60 seconds. The board checks every value.</p>
+      <h5>Wi-Fi</h5>
+      <button class="btn ghost" id="setupBtn">Restart into setup mode</button>
+      <p class="note">Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>
+    </div>
+
+    <!-- Reconnect guide -->
+    <div id="viewGuide" hidden>
+      <div class="top"><span>Home</span><span class="status"><i></i><span id="gStatus">Offline</span></span></div>
+      <div id="gOk" class="ok-banner" hidden>Back online</div>
+      <div id="gSteps">
+        <div class="alertb"><b id="gTitle">The board isn't answering</b><span id="gSeen"></span></div>
+        <div class="step"><em>1</em><span>Is it powered?<small>Check the USB cable and that a light is on.</small></span></div>
+        <div class="step now"><em>2</em><span>Did the Wi-Fi change?<small>A new router or password means the board can't join.</small></span></div>
+        <div class="step"><em>3</em><span>Hold the left button (D1) for 5 seconds<small>The yellow light blinks fast: setup mode.</small></span></div>
+        <div class="step"><em>4</em><span>On your phone, join "SmartHome-Setup"<small>Choose your Wi-Fi and enter its password.</small></span></div>
+        <div class="step"><em>5</em><span>Wait here<small>This page tells you when the board is back.</small></span></div>
+      </div>
+      <button class="btn ghost" id="gBack">Back to the dashboard</button>
     </div>
   </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"></script>
-<script type="module">
-import { describeBanner, ageText, onOff } from './logic.js';
-
-const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
-const $ = (id) => document.getElementById(id);
-const state = { status: undefined, temp: undefined, presence: undefined, presenceChanged: undefined, alert: 'none', away: false, led: { 1: false, 2: false, 3: false } };
-let client = null, everConnected = false;
-
-function render() {
-  const online = state.status === 'online';
-  $('dot').className = 'dot' + (online ? ' online' : '');
-  $('statusText').textContent = online ? 'online' : 'offline';
-  const b = describeBanner({ alert: state.alert, status: state.status });
-  $('banner').hidden = b.level === 'ok';
-  $('banner').className = 'banner ' + b.level;
-  $('banner').textContent = b.text;
-  $('temp').textContent = online && state.temp !== undefined ? `${state.temp}°C` : '--';
-  $('presence').textContent = online && state.presence !== undefined ? (state.presence ? 'Someone' : 'Clear') : '--';
-  $('age').textContent = online && state.presenceChanged ? 'last change: ' + ageText(Date.now() / 1000, state.presenceChanged) : '';
-  for (const sw of document.querySelectorAll('.sw')) {
-    const on = sw.id === 'away' ? state.away : state.led[sw.dataset.led];
-    sw.classList.toggle('on', !!on);
-    sw.setAttribute('aria-pressed', String(!!on));
-    sw.disabled = !online;
-  }
-}
-
-function handle(topic, buf) {
-  const v = buf.toString();
-  const t = topic.replace(/^smarthome\//, '');
-  if (t === 'status') state.status = v;
-  else if (t === 'temp') state.temp = v;
-  else if (t === 'presence') state.presence = v === '1';
-  else if (t === 'presence_changed') state.presenceChanged = Number(v);
-  else if (t === 'alert') state.alert = v;
-  else if (t === 'state/away') { const o = onOff(v); if (o !== null) state.away = o; }
-  else if (t.startsWith('state/led')) { const o = onOff(v), n = t.slice(-1); if (o !== null && state.led[n] !== undefined) state.led[n] = o; }
-  render();
-}
-
-function connect(username, password) {
-  $('loginError').textContent = '';
-  $('loginBtn').disabled = true;
-  everConnected = false;
-  client = mqtt.connect(BROKER, { username, password, clientId: 'web-' + Math.random().toString(16).slice(2, 10), keepalive: 30, reconnectPeriod: 3000, connectTimeout: 10000 });
-  client.on('connect', () => {
-    everConnected = true;
-    client.subscribe('smarthome/#');
-    $('login').hidden = true; $('app').hidden = false;
-    $('pass').value = '';
-    render();
-  });
-  client.on('message', handle);
-  client.on('error', (e) => { if (!everConnected) fail(e); });
-  client.on('close', () => { if (everConnected) { state.status = undefined; render(); } });
-  setTimeout(() => { if (!everConnected) fail(); }, 12000);
-}
-
-function fail() {
-  if (client) { client.end(true); client = null; }
-  $('loginError').textContent = 'Login failed. Check your username and password.';
-  $('loginBtn').disabled = false;
-}
-
-$('loginForm').addEventListener('submit', (e) => { e.preventDefault(); connect($('user').value, $('pass').value); });
-
-document.querySelectorAll('.sw[data-led]').forEach((sw) => sw.addEventListener('click', () => {
-  const n = sw.dataset.led;
-  client.publish(`smarthome/cmd/led${n}`, state.led[n] ? 'off' : 'on');
-}));
-$('away').addEventListener('click', () => client.publish('smarthome/cmd/away', state.away ? 'off' : 'on', { retain: true }));
-setInterval(() => { if (!$('app').hidden) render(); }, 30000);
-</script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
