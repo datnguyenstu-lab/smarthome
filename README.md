@@ -50,7 +50,7 @@ A wrong password is refused. The log records `ota start` and `ota end`. Only the
 Prepare the images once (about 2 minutes; they hold your `secrets.h`, so `demo/` is git-ignored):
 
 ```
-powershell -File toolsuild_demo.ps1                 # builds demoirmware-2.0.0.bin and demoirmware-2.1.0-demo.bin
+powershell -File tools\build_demo.ps1                 # builds demo\firmware-2.0.0.bin and demo\firmware-2.1.0-demo.bin
 ```
 
 On the day, with the computer on the board's network and the page open on Health (the **Firmware** row):
