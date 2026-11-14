@@ -76,6 +76,7 @@ Two files are never committed in plain form (they are git-ignored): `include/sec
 
 - **From the board:** hold button 1 (D1) for 5 seconds. The yellow light fast-blinks.
 - **From the page:** Settings, then "Restart into setup mode".
+- **Forget the Wi-Fi password:** Settings, then "Forget Wi-Fi password" (or `smarthome/cmd/forgetwifi`). It erases the saved network and password and opens setup mode, and the board does not fall back to the default network from `secrets.h` until you save a new one.
 - **Automatically:** if the board cannot join any network at boot.
 
 Join the **SmartHome-Setup** network (password `SETUP_AP_PASS` from `secrets.h`), open `192.168.4.1` if the page does not appear, choose your 2.4 GHz network and save. The portal closes after 3 minutes and the board reboots.

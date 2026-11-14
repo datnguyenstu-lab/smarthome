@@ -111,6 +111,7 @@ function renderSettings() {
   else if (!dirty && state.settings) { note.textContent = 'Applied on the board.'; note.className = 'note good'; }
   else note.textContent = '';
   $('setupBtn').disabled = !online;
+  $('forgetBtn').disabled = !online;
 }
 
 function updateGuide() {
@@ -249,6 +250,11 @@ $('setupBtn').addEventListener('click', () => {
   if (!confirm('Restart the board into setup mode? It goes offline until you join its "SmartHome-Setup" network.')) return;
   publish('smarthome/cmd/setup', '1');
   $('sNote').textContent = 'Restart command sent. Follow the steps on the Home screen when the board goes offline.';
+});
+$('forgetBtn').addEventListener('click', () => {
+  if (!confirm('Forget the saved Wi-Fi network and password? The board goes offline and opens "SmartHome-Setup" until you choose a network again.')) return;
+  publish('smarthome/cmd/forgetwifi', '1');
+  $('sNote').textContent = 'Forget command sent. Join "SmartHome-Setup" on your phone to give the board a Wi-Fi network.';
 });
 
 // ---- Download the board's event log: list the files, pull each in chunks, re-request after a stall, save one file ----

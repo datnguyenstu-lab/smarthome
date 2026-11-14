@@ -111,6 +111,7 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
   }
   // A retained cmd/setup or cmd/selftest arrives right after connecting; ignore that so it cannot boot-loop the board.
   if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
+  if (strcmp(topic, T_CMD_FORGET_WIFI) == 0) { if (millis() - connectMs > 3000) wifiSetup::forgetAndSetup(); return; }
   if (strcmp(topic, T_CMD_LOG) == 0) { if (millis() - connectMs > 3000) eventLog::handleCommand(payload, len); return; }
   if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(3000); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);

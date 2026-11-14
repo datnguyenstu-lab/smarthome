@@ -3,6 +3,7 @@
 #include <WiFiManager.h>
 #include "secrets.h"
 #include "event_log.h"
+#include <LittleFS.h>
 
 namespace wifiSetup {
 
@@ -10,6 +11,7 @@ static const char* AP_NAME = "SmartHome-Setup";
 static const uint32_t JOIN_TIMEOUT_MS = 20000;
 static const uint32_t PORTAL_TIMEOUT_S = 180;
 static void (*tickCb)() = nullptr;
+static const char* NO_DEFAULT_FLAG = "/no_default_wifi";   // present while the owner has forgotten the network
 
 void onTick(void (*cb)()) { tickCb = cb; }
 
@@ -28,7 +30,9 @@ static bool waitForPortal(WiFiManager& wm) {
 
 bool connect() {
   WiFi.mode(WIFI_STA);
-  if (WiFi.SSID().length() == 0) {  // first boot: nothing saved, use the secrets.h default
+  bool forgotten = LittleFS.begin() && LittleFS.exists(NO_DEFAULT_FLAG);
+  if (WiFi.SSID().length() > 0 && forgotten) LittleFS.remove(NO_DEFAULT_FLAG);   // a network was saved again
+  if (WiFi.SSID().length() == 0 && !forgotten) {  // first boot: nothing saved, use the secrets.h default
     WiFi.begin(WIFI_SSID, WIFI_PASS);
     uint32_t t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < JOIN_TIMEOUT_MS) delay(250);
@@ -52,6 +56,14 @@ void startPortal() {
   eventLog::add("setup", joined ? "end" : "end timeout");
   eventLog::flush();
   ESP.restart();  // back to normal, whether saved or timed out
+}
+
+void forgetAndSetup() {
+  eventLog::add("wifi", "forget saved network");
+  eventLog::flush();
+  if (LittleFS.begin()) { File f = LittleFS.open(NO_DEFAULT_FLAG, "w"); if (f) f.close(); }
+  { WiFiManager wm; wm.resetSettings(); }   // erases the saved network and password
+  startPortal();                            // waits for a new network, then restarts
 }
 
 }  // namespace wifiSetup

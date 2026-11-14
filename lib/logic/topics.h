@@ -16,6 +16,7 @@ constexpr const char* T_INFO = "smarthome/info";
 constexpr const char* T_CMD_SETTINGS = "smarthome/cmd/settings";
 constexpr const char* T_CMD_SELFTEST = "smarthome/cmd/selftest";
 constexpr const char* T_CMD_SETUP = "smarthome/cmd/setup";
+constexpr const char* T_CMD_FORGET_WIFI = "smarthome/cmd/forgetwifi";
 constexpr const char* T_CMD_LOG = "smarthome/cmd/log";
 constexpr const char* T_LOG_INDEX = "smarthome/log/index";
 constexpr const char* T_LOG_DATA = "smarthome/log/data";
