@@ -50,16 +50,16 @@ void startPortal() {
   WiFiManager wm;
   wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
   wm.setConfigPortalBlocking(false);
-  eventLog::add("setup", "start");
+  eventLog::info("setup", "setup mode started");
   wm.startConfigPortal(AP_NAME, SETUP_AP_PASS);
   bool joined = waitForPortal(wm);
-  eventLog::add("setup", joined ? "end" : "end timeout");
+  if (joined) eventLog::info("setup", "setup mode ended, network saved"); else eventLog::warn("setup", "setup mode timed out");
   eventLog::flush();
   ESP.restart();  // back to normal, whether saved or timed out
 }
 
 void forgetAndSetup() {
-  eventLog::add("wifi", "forget saved network");
+  eventLog::warn("wifi", "saved network and password erased on request");
   eventLog::flush();
   if (LittleFS.begin()) { File f = LittleFS.open(NO_DEFAULT_FLAG, "w"); if (f) f.close(); }
   { WiFiManager wm; wm.resetSettings(); }   // erases the saved network and password

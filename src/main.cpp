@@ -103,7 +103,7 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
     if (parseSettings(payload, len, s) && !sameSettings(s, settings)) {
       settings = s;
       settingsStore::save(settings);  // only when something changed: the echo never writes flash
-      { char d[96]; if (formatSettings(settings, d, sizeof(d))) eventLog::add("settings", d); }
+      { char d[96]; if (formatSettings(settings, d, sizeof(d))) { char m[120]; snprintf(m, sizeof(m), "updated %s", d); eventLog::info("settings", m); } }
       publishAlertIfChanged();
     }
     publishSettings();  // the echo shows what the board really holds
@@ -124,7 +124,12 @@ void setup() {
   leds::begin();
   sensors::begin();
   eventLog::begin();
-  { char d[64]; snprintf(d, sizeof(d), "reset=%s fw=%s", healthMonitor::resetReason(), FW_VERSION); eventLog::add("boot", d); }
+  {
+    const char* r = healthMonitor::resetReason();
+    bool crash = strstr(r, "watchdog") || strcmp(r, "exception") == 0;   // an unexpected restart is a warning
+    char d[64]; snprintf(d, sizeof(d), "reset=%s fw=%s", r, FW_VERSION);
+    if (crash) eventLog::warn("boot", d); else eventLog::info("boot", d);
+  }
   settings = settingsStore::load();
   wifiSetup::onTick([]() { driveStatusLed(true); });
   healthMonitor::onTick([]() { driveStatusLed(false); });
@@ -151,7 +156,7 @@ void loop() {
   if (open != doorOpen) {
     doorOpen = open; doorOpenSinceMs = now;
     publishDoor(true);
-    eventLog::add("door", open ? "open" : "closed");
+    eventLog::info("door", open ? "door open" : "door closed");
   }
   publishAlertIfChanged();   // the grace time runs out without any event, so check every loop (publishes only on change)
   healthMonitor::tick(now, tempValid(lastTemp), away, doorOpen ? now - doorOpenSinceMs : 0);

@@ -1,6 +1,8 @@
 // Pure helpers for pulling the board's event log over MQTT. No DOM, no MQTT, so node --test can run them.
 // Chunk payload: "<seq>:<offset>:<total>\n" followed by raw bytes. Offsets count bytes, not characters.
 
+import { formatBuild } from './logic.js';
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
@@ -40,4 +42,18 @@ export function requestMessage(kind, seq, offset = 0) {
   if (kind === 'list') return JSON.stringify({ list: 1 });
   if (kind === 'get') return JSON.stringify({ get: seq, offset });
   throw new Error(`unknown log request: ${kind}`);
+}
+
+// The text that starts a downloaded log file: what it is, which firmware wrote it, when it was downloaded.
+export function buildLogHeader(info, downloadedIso) {
+  const built = info?.build ? ` (built ${formatBuild(info.build)})` : '';
+  return [
+    '# Cold Storage Monitor - event log',
+    `# Firmware: ${info?.fw || 'unknown'}${built}`,
+    `# Chip: ${info?.chip || 'unknown'}`,
+    `# Downloaded: ${downloadedIso}`,
+    '# Format: time (ISO 8601 UTC, or T+hh:mm:ss since boot), level, component, message',
+    '',
+    '',
+  ].join('\n');
 }

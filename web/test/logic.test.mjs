@@ -191,10 +191,11 @@ test('formatBuild keeps a build stamp and handles missing', () => {
 
 test('describeAbout accepts the four fields and trims them', () => {
   assert.deepEqual(describeAbout({ name: '  Ann Lee ', student_id: '123', class: 'C1', year: '2026-2027' }),
-    { name: 'Ann Lee', studentId: '123', className: 'C1', year: '2026-2027' });
+    { name: 'Ann Lee', studentId: '123', className: 'C1', year: '2026-2027', supervisor: '' });
+  assert.equal(describeAbout({ name: 'Ann', supervisor: '  Dr Smith ' }).supervisor, 'Dr Smith');
 });
 test('describeAbout keeps what is there and drops the rest', () => {
-  assert.deepEqual(describeAbout({ name: 'Ann', extra: 'x', student_id: 42 }), { name: 'Ann', studentId: '', className: '', year: '' });
+  assert.deepEqual(describeAbout({ name: 'Ann', extra: 'x', student_id: 42 }), { name: 'Ann', studentId: '', className: '', year: '', supervisor: '' });
 });
 test('describeAbout returns null when there is nothing to show', () => {
   assert.equal(describeAbout(undefined), null);
@@ -203,6 +204,7 @@ test('describeAbout returns null when there is nothing to show', () => {
   assert.equal(describeAbout([]), null);
   assert.equal(describeAbout({}), null);
   assert.equal(describeAbout({ name: '   ' }), null);
+  assert.equal(describeAbout({ supervisor: 'Dr Smith' }).supervisor, 'Dr Smith');   // a supervisor alone is enough to show the section
 });
 test('describeAbout cuts very long values', () => {
   assert.equal(describeAbout({ name: 'x'.repeat(200) }).name.length, 60);

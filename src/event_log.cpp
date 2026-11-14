@@ -106,14 +106,14 @@ void flush() {
   lastFlushMs = millis();
 }
 
-void add(const char* code, const char* detail) {
+void add(logic::LogLevel level, const char* component, const char* message) {
   char line[160];
-  size_t n = logic::formatLogLine(line, sizeof(line), (uint32_t)time(nullptr), millis() / 1000, code, detail);
+  size_t n = logic::formatLogLine(line, sizeof(line), (uint32_t)time(nullptr), millis() / 1000, level, component, message);
   if (n == 0) return;
   if (bufLen + n > sizeof(buf)) flush();
   memcpy(buf + bufLen, line, n);
   bufLen += n;
-  if (strcmp(code, "boot") == 0) flush();  // the reset reason must survive a crash loop
+  if (strcmp(component, "boot") == 0) flush();  // the reset reason must survive a crash loop
 }
 
 static bool findUint(const char* json, const char* key, uint32_t& out) {
@@ -147,6 +147,23 @@ static uint32_t servableSize(uint32_t seq, bool& exists) {
   }
   f.close();
   return size;
+}
+
+// Deletes every log file and starts a fresh one (the sequence number keeps growing).
+static void clearAll() {
+  bufLen = 0;
+  streamActive = false;
+  Dir d = LittleFS.openDir("/");
+  while (d.next()) {
+    String n = d.fileName();
+    if (n.startsWith("log_") && n.endsWith(".txt")) LittleFS.remove("/" + n);
+  }
+  curSeq++;
+  File f = LittleFS.open(pathFor(curSeq), "w");
+  if (f) f.close();
+  curBytes = 0;
+  add(logic::LogLevel::Warn, "log", "log cleared on request");
+  flush();
 }
 
 static void publishIndex() {
@@ -192,6 +209,7 @@ void handleCommand(const char* payload, unsigned len) {
   if (!mounted) return;
   uint32_t v;
   if (strstr(payload, "\"list\"")) { publishIndex(); return; }
+  if (strstr(payload, "\"clear\"")) { clearAll(); return; }
   uint32_t seq;
   if (findUint(payload, "get", seq)) {
     flush();  // the newest file must include everything logged so far

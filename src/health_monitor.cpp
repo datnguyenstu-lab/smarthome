@@ -88,9 +88,10 @@ static void publishSelfTest(bool tempOk) {
            (unsigned long)time(nullptr), tempOk ? "true" : "false", doorOk ? "true" : "false", wifiOk ? "true" : "false",
            net::connected() ? "true" : "false");
   net::publish(logic::T_SELFTEST, buf, true);
-  char d[64];
-  snprintf(d, sizeof(d), "temp=%s door=%s wifi=%s cloud=%s", tempOk ? "ok" : "FAIL", doorOk ? "ok" : "FAIL", wifiOk ? "ok" : "FAIL", net::connected() ? "ok" : "FAIL");
-  eventLog::add("selftest", d);
+  bool allOk = tempOk && doorOk && wifiOk && net::connected();
+  char d[72];
+  snprintf(d, sizeof(d), "%s temp=%s door=%s wifi=%s cloud=%s", allOk ? "passed" : "failed", tempOk ? "ok" : "FAIL", doorOk ? "ok" : "FAIL", wifiOk ? "ok" : "FAIL", net::connected() ? "ok" : "FAIL");
+  if (allOk) eventLog::info("selftest", d); else eventLog::warn("selftest", d);
 }
 
 float selfTestAtBoot() {
@@ -129,8 +130,8 @@ void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t doorOpenMs) {
   if (changed) {
     for (uint8_t bit = 1; bit != 0 && bit <= logic::ISSUE_CRASH_REBOOT; bit <<= 1) {
       char d[40];
-      if ((m & bit) && !(mask & bit)) { snprintf(d, sizeof(d), "raised %s", logic::issueName(bit)); eventLog::add("issue", d); }
-      if (!(m & bit) && (mask & bit)) { snprintf(d, sizeof(d), "cleared %s", logic::issueName(bit)); eventLog::add("issue", d); }
+      if ((m & bit) && !(mask & bit)) { snprintf(d, sizeof(d), "raised %s", logic::issueName(bit)); eventLog::warn("issue", d); }
+      if (!(m & bit) && (mask & bit)) { snprintf(d, sizeof(d), "cleared %s", logic::issueName(bit)); eventLog::info("issue", d); }
     }
   }
   mask = m;

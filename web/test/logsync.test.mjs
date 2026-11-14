@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseChunk, LogAssembler, requestMessage } from '../logsync.js';
+import { parseChunk, LogAssembler, requestMessage, buildLogHeader } from '../logsync.js';
 
 const enc = (s) => new TextEncoder().encode(s);
 const chunk = (seq, offset, total, data) => enc(`${seq}:${offset}:${total}\n${data}`);
@@ -75,4 +75,20 @@ test('requestMessage list and get', () => {
   assert.equal(requestMessage('list'), '{"list":1}');
   assert.deepEqual(JSON.parse(requestMessage('get', 4, 768)), { get: 4, offset: 768 });
   assert.throws(() => requestMessage('nope'));
+});
+
+test('buildLogHeader describes the file with firmware, chip and download time', () => {
+  const h = buildLogHeader({ fw: '2.0.0', build: 'Nov 14 2026 23:08:47', chip: 'esp8266-3fa492' }, '2026-11-15T10:50:00Z');
+  const lines = h.split('\n');
+  assert.equal(lines[0], '# Cold Storage Monitor - event log');
+  assert.ok(lines.includes('# Firmware: 2.0.0 (built Nov 14 2026, 23:08)'));
+  assert.ok(lines.includes('# Chip: esp8266-3fa492'));
+  assert.ok(lines.includes('# Downloaded: 2026-11-15T10:50:00Z'));
+  assert.ok(lines.some((l) => l.startsWith('# Format: ')));
+  assert.equal(h.endsWith('\n\n'), true);   // a blank line separates the header from the log lines
+});
+test('buildLogHeader copes with missing board information', () => {
+  const h = buildLogHeader(null, '2026-11-15T10:50:00Z');
+  assert.match(h, /# Firmware: unknown/);
+  assert.match(h, /# Chip: unknown/);
 });

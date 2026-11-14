@@ -123,7 +123,14 @@ The board keeps the newest 3 log files of up to 64 KB in its flash (`LOG_MAX_BYT
 python tools/pull_log.py log.txt
 ```
 
-Lines look like `1794669920 ota start`. A time starting with `+` means the clock was not set yet (seconds since boot).
+Each line is `<time> <LEVEL> <component> <message>`, for example:
+
+```
+2026-11-14T17:19:04Z WARN  wifi     connection lost
+2026-11-14T17:19:13Z INFO  selftest passed temp=ok door=ok wifi=ok cloud=ok
+```
+
+The time is ISO 8601 UTC; `T+hh:mm:ss` means the clock was not set yet (time since boot). Levels are `INFO`, `WARN` and `ERROR`. The downloaded file starts with a short header (firmware, chip, download time). To empty the log: `python tools/watch.py 3 'smarthome/cmd/log={"clear":1}'`.
 
 ## MQTT topics (prefix `smarthome/`)
 

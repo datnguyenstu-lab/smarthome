@@ -3,11 +3,17 @@
 #include <cstdint>
 namespace logic {
 
-// "<epoch> <code> <detail>\n", or "+<uptimeS> <code> <detail>\n" while the clock is not set yet
-// (epoch below 1700000000). \r and \n inside `detail` become spaces; `detail` is cut to fit; an empty or
-// null detail leaves no trailing space. Returns the length (the line always ends with one '\n'), or 0 when
-// `cap` is under 24.
-size_t formatLogLine(char* buf, size_t cap, uint32_t epoch, uint32_t uptimeS, const char* code, const char* detail);
+enum class LogLevel { Info, Warn, Error };
+
+// One log line: "<time> <LEVEL> <component> <message>" ending in a single newline, for example
+//   2026-11-14T11:48:13Z INFO  boot     reset=power fw=2.0.0
+//   2026-11-14T11:48:20Z WARN  wifi     connection lost
+// The time is ISO 8601 UTC. While the clock is not set yet (epoch below 1700000000) it is the time since boot,
+// "T+hh:mm:ss". LEVEL is padded to 5 characters and the component to 8. A newline or carriage return inside
+// `message` becomes a space and the message is cut to fit. An empty or null message leaves no trailing space.
+// Returns the length, or 0 when `cap` is under 48.
+size_t formatLogLine(char* buf, size_t cap, uint32_t epoch, uint32_t uptimeS, LogLevel level, const char* component,
+                     const char* message);
 
 // Start a new file when the next line would not fit (never on an empty file).
 struct LogRotation {

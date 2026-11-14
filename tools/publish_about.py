@@ -18,7 +18,7 @@ clear = "--clear" in sys.argv
 payload = b""
 if not clear:
     data = json.loads((ROOT / "include" / "about.json").read_text(encoding="utf-8"))
-    allowed = {"name", "student_id", "class", "year"}
+    allowed = {"name", "student_id", "class", "year", "supervisor"}
     unknown = set(data) - allowed
     if unknown:
         sys.exit(f"about.json has unknown keys: {sorted(unknown)} (allowed: {sorted(allowed)})")
