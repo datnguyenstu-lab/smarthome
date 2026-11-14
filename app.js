@@ -1,5 +1,5 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
-  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor } from './logic.js';
+  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor, doorRowState } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage, buildLogHeader } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
@@ -50,8 +50,11 @@ function renderHome() {
 
   const d = describeDoor(state.door, state.doorChanged, nowSec());   // the IR sensor is the door sensor
   $('door').textContent = online ? d.label : '--';
-  $('age').textContent = online && d.since ? `since ${d.since}` : '';
-  $('doorRow').classList.toggle('alarm', online && d.state === 'open');
+  const rowState = doorRowState({ online, door: state.door, alert: state.alert });
+  const grace = Number(state.settings?.door_open_s);
+  $('age').textContent = online && d.since ? `since ${d.since}` + (rowState === 'watch' && grace > 0 ? ` · warns after ${grace} s` : '') : '';
+  $('doorRow').classList.toggle('alarm', rowState === 'alarm');
+  $('doorRow').classList.toggle('watch', rowState === 'watch');
   for (const b of document.querySelectorAll('.lamp')) {
     const n = b.dataset.led;
     b.querySelector('.lname').textContent = LIGHTS[n];

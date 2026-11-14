@@ -87,3 +87,4 @@ h5 { margin:20px 0 6px; font-size:13px; color:var(--mut); font-weight:600; }
 .row.alarm .m { color:#fff; }
 
 .btn.danger { border-color:var(--bad); color:var(--bad); }
+.row.watch { background:transparent; border:1.5px solid var(--bad); }
