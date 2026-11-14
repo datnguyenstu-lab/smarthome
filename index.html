@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Smart Home</title>
+<title>Cold Storage Monitor</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600&family=Manrope:wght@400;600;800&display=swap">
 <link rel="stylesheet" href="app.css">
 </head>
@@ -12,7 +12,7 @@
 <main>
   <section id="login">
     <span class="logotile"><img src="assets/vetc-logo.png" alt="School logo" width="64" height="64"></span>
-    <h1>Smart Home</h1>
+    <h1>Cold Storage Monitor</h1>
     <p class="sub left">School project</p>
     <form id="loginForm">
       <input id="user" placeholder="Username" autocomplete="username" required>
@@ -25,7 +25,7 @@
   <section id="app" hidden>
     <!-- Home -->
     <div id="viewHome">
-      <div class="top"><span>Home</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
+      <div class="top"><span>Cold storage</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
       <div id="alerts"></div>
       <div class="dial">
         <svg viewBox="0 0 240 135" aria-hidden="true">
@@ -36,19 +36,19 @@
         </svg>
         <div class="num"><span id="temp">--</span><small>°C</small></div>
       </div>
-      <div class="sub">Room temperature</div>
-      <div class="row"><span id="presence">--</span><span class="m" id="age"></span></div>
+      <div class="sub">Storage temperature</div>
+      <div class="row" id="doorRow"><span id="door">--</span><span class="m" id="age"></span></div>
       <div class="lamps" id="lamps">
         <button class="lamp" data-led="2" aria-pressed="false"><b></b><span class="lname"></span></button>
         <button class="lamp" data-led="3" aria-pressed="false"><b></b><span class="lname"></span></button>
       </div>
-      <div class="row"><span id="awayLabel">Away mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
+      <div class="row"><span id="awayLabel">Lock-up mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
       <button class="row navrow" id="guideLink" data-go="guide" hidden><span>Board offline: reconnect guide</span><span class="m">›</span></button>
       <button class="row navrow" data-go="health"><span id="healthLine">Health</span><span class="m">›</span></button>
       <button class="row navrow" data-go="settings"><span>Settings</span><span class="m">›</span></button>
       <button class="foot" data-go="about" aria-label="About this software">
         <img src="assets/vetc-logo.png" alt="" width="24" height="24">
-        <span id="footVersions">Smart Home</span><span class="m">About ›</span>
+        <span id="footVersions">Cold Storage Monitor</span><span class="m">About ›</span>
       </button>
     </div>
 
@@ -75,20 +75,20 @@
     <!-- Settings -->
     <div id="viewSettings" hidden>
       <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Settings</span></div>
-      <h5>Heat alert</h5>
+      <h5>Temperature alert</h5>
       <div class="row"><label for="sHot">Warn me above</label>
-        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="20" max="60" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
+        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="-25" max="30" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
       <p class="note bad" id="eHot"></p>
-      <h5>Presence sensor</h5>
-      <div class="row"><label for="sHold">Keep "someone there" for</label>
-        <span class="stepper"><button data-step="sHold" data-d="-1" aria-label="Shorter">−</button><input id="sHold" type="number" inputmode="numeric" min="1" max="60" step="1"><span>s</span><button data-step="sHold" data-d="1" aria-label="Longer">+</button></span></div>
-      <p class="note bad" id="eHold"></p>
+      <h5>Door</h5>
+      <div class="row"><label for="sDoor">Warn me when the door stays open for</label>
+        <span class="stepper"><button data-step="sDoor" data-d="-5" aria-label="Shorter">−</button><input id="sDoor" type="number" inputmode="numeric" min="0" max="600" step="1"><span>s</span><button data-step="sDoor" data-d="5" aria-label="Longer">+</button></span></div>
+      <p class="note bad" id="eDoor"></p>
       <h5>Board light</h5>
       <div class="row"><span id="sLedLabel">Yellow light shows problems</span><button class="tg" id="sLed" role="switch" aria-checked="true" aria-labelledby="sLedLabel"></button></div>
       <p class="note" id="sNote"></p>
       <button class="btn" id="sSave">Save settings</button>
       <button class="btn ghost" id="sReset">Reset to defaults</button>
-      <p class="note">Heat alert: 20 to 60 °C. Presence hold: 1 to 60 seconds. The board checks every value.</p>
+      <p class="note">Temperature alert: -25 to 30 °C. Door time: 0 to 600 seconds (0 warns at once). In lock-up mode an open door raises the alarm at once. The board checks every value.</p>
       <h5>Wi-Fi</h5>
       <button class="btn ghost" id="setupBtn">Restart into setup mode</button>
       <p class="note">Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>
@@ -99,7 +99,7 @@
       <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>About</span></div>
       <div class="aboutbrand">
         <span class="logotile big"><img src="assets/vetc-logo.png" alt="School logo" width="72" height="72"></span>
-        <div><b>Smart Home</b><span class="sub left">School project · <a href="https://vetc.edu.vn/" target="_blank" rel="noopener">vetc.edu.vn</a></span></div>
+        <div><b>Cold Storage Monitor</b><span class="sub left">School project · <a href="https://vetc.edu.vn/" target="_blank" rel="noopener">vetc.edu.vn</a></span></div>
       </div>
       <div id="aStudent" hidden>
         <h5>Student</h5>

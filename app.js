@@ -1,16 +1,16 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
-  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from './logic.js';
+  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
 const APP_VERSION = '2.0.0';  // the page's own release: keep major.minor equal to the board firmware's
-const LIGHTS = { 2: 'Bed light', 3: 'Living room' };  // led 1 (yellow) is the board's status light, not shown
-const DEFAULTS = { hot_on_c: 35, presence_hold_s: 5, status_led: true };
+const LIGHTS = { 2: 'Main storage', 3: 'Secondary storage' };  // led 1 (yellow) is the board's status light, not shown
+const DEFAULTS = { hot_on_c: 8, door_open_s: 10, status_led: true };
 const VIEWS = { home: 'viewHome', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide', about: 'viewAbout' };
 const $ = (id) => document.getElementById(id);
 const nowSec = () => Date.now() / 1000;
 
-const state = { status: undefined, temp: undefined, presence: undefined, presenceChanged: undefined, alert: 'none',
+const state = { status: undefined, temp: undefined, door: undefined, doorChanged: undefined, alert: 'none',
   away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null, about: null };
 let client = null, everConnected = false, connected = false, ready = false;
 let view = 'home', guideDismissed = false, celebrating = false;
@@ -48,8 +48,10 @@ function renderHome() {
   lab.setAttribute('x', (120 + 124 * c).toFixed(1)); lab.setAttribute('y', Math.max(9, 120 - 124 * s).toFixed(1));
   lab.textContent = `alert at ${hot}°`;
 
-  $('presence').textContent = online && state.presence !== undefined ? (state.presence ? 'Someone there' : 'Nobody there') : '--';
-  $('age').textContent = online && state.presenceChanged ? ageText(nowSec(), state.presenceChanged) : '';
+  const d = describeDoor(state.door, state.doorChanged, nowSec());   // the IR sensor is the door sensor
+  $('door').textContent = online ? d.label : '--';
+  $('age').textContent = online && d.since ? `since ${d.since}` : '';
+  $('doorRow').classList.toggle('alarm', online && d.state === 'open');
   for (const b of document.querySelectorAll('.lamp')) {
     const n = b.dataset.led;
     b.querySelector('.lname').textContent = LIGHTS[n];
@@ -99,7 +101,7 @@ function renderSettings() {
   const online = state.status === 'online';
   if (!dirty && state.settings) {
     $('sHot').value = state.settings.hot_on_c;
-    $('sHold').value = state.settings.presence_hold_s;
+    $('sDoor').value = state.settings.door_open_s;
     $('sLed').setAttribute('aria-checked', String(!!state.settings.status_led));
   }
   const note = $('sNote');
@@ -160,8 +162,8 @@ function handle(topic, buf) {
   const t = topic.replace(/^smarthome\//, '');
   if (t === 'status') state.status = v;
   else if (t === 'temp') state.temp = v;
-  else if (t === 'presence') state.presence = v === '1';
-  else if (t === 'presence_changed') state.presenceChanged = Number(v);
+  else if (t === 'door') state.door = v;
+  else if (t === 'door_changed') state.doorChanged = Number(v);
   else if (t === 'alert') state.alert = v;
   else if (t === 'state/away') { const o = onOff(v); if (o !== null) state.away = o; }
   else if (t === 'state/led2' || t === 'state/led3') { const o = onOff(v); if (o !== null) state.led[t.slice(-1)] = o; }
@@ -225,13 +227,13 @@ document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('clic
   input.value = String((Number(input.value) || 0) + Number(b.dataset.d));
   dirty = true; render();
 }));
-for (const id of ['sHot', 'sHold']) $(id).addEventListener('input', () => { dirty = true; });
+for (const id of ['sHot', 'sDoor']) $(id).addEventListener('input', () => { dirty = true; });
 $('sLed').addEventListener('click', () => { $('sLed').setAttribute('aria-checked', String($('sLed').getAttribute('aria-checked') !== 'true')); dirty = true; });
 
 function saveSettings() {
-  const r = validateSettings({ hot_on_c: $('sHot').value, presence_hold_s: $('sHold').value, status_led: $('sLed').getAttribute('aria-checked') === 'true' });
+  const r = validateSettings({ hot_on_c: $('sHot').value, door_open_s: $('sDoor').value, status_led: $('sLed').getAttribute('aria-checked') === 'true' });
   $('eHot').textContent = r.errors.hot_on_c ?? '';
-  $('eHold').textContent = r.errors.presence_hold_s ?? '';
+  $('eDoor').textContent = r.errors.door_open_s ?? '';
   if (!r.ok) return;
   pending = r.value; dirty = true;
   publish('smarthome/cmd/settings', settingsMessage(r.value), true);
@@ -239,7 +241,7 @@ function saveSettings() {
 }
 $('sSave').addEventListener('click', saveSettings);
 $('sReset').addEventListener('click', () => {
-  $('sHot').value = DEFAULTS.hot_on_c; $('sHold').value = DEFAULTS.presence_hold_s;
+  $('sHot').value = DEFAULTS.hot_on_c; $('sDoor').value = DEFAULTS.door_open_s;
   $('sLed').setAttribute('aria-checked', String(DEFAULTS.status_led));
   saveSettings();
 });
