@@ -39,6 +39,7 @@ static void setAway(bool on) {
 
 static void readTemp() {
   lastTemp = sensors::readTempC();
+  Serial.printf("DS18B20 raw: %.2f\n", lastTemp);  // -127 = not found, 85 = bad power/pull-up
   if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
   publishAlertIfChanged();
 }
