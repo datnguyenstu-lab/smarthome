@@ -43,9 +43,9 @@ export function describeIssues(codes) {
   }));
 }
 
-const STALE_AFTER_S = 180;
+const STALE_AFTER_S = 60;  // the board reports health every 10 s, so 6 missed reports
 
-// True when the board cannot be trusted to be alive: offline, or no health heartbeat for 3 minutes.
+// True when the board cannot be trusted to be alive: offline, or no health heartbeat for 60 seconds.
 // Uses the heartbeat's own timestamp, so an old retained message from hours ago counts as stale.
 export function isStale(nowSec, healthTs, status) {
   if (status !== 'online') return true;
