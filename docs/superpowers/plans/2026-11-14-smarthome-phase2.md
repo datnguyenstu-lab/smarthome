@@ -155,7 +155,7 @@
   - the same `watch.py` command prints `smarthome/settings = {"hot_on_c":40.0,"presence_hold_s":10,"status_led":true}`;
   - reboot the board (RST): the echo shows the same saved values (survived reboot);
   - send `{"hot_on_c":500}`: echo shows `hot_on_c` 60.0; send `garbage`: no change and no new write;
-  - send `smarthome/cmd/setup=1`: the board opens `SmartHome-Setup` (owner joins with `smart1234`, then power-cycles or lets it time out after 180 s).
+  - send `smarthome/cmd/setup=1`: the board opens `SmartHome-Setup` (owner joins with the `SETUP_AP_PASS` from `secrets.h`, then power-cycles or lets it time out after 180 s).
 - [ ] **Step 5: Commit** `feat: settings stored on the board, setup command, watch tool`.
 
 ### Task 5: Firmware health and self-test
