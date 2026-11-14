@@ -1,16 +1,17 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
-  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText } from './logic.js';
+  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
+const APP_VERSION = '2.0.0';  // the page's own release: keep major.minor equal to the board firmware's
 const LIGHTS = { 2: 'Bed light', 3: 'Living room' };  // led 1 (yellow) is the board's status light, not shown
 const DEFAULTS = { hot_on_c: 35, presence_hold_s: 5, status_led: true };
-const VIEWS = { home: 'viewHome', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide' };
+const VIEWS = { home: 'viewHome', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide', about: 'viewAbout' };
 const $ = (id) => document.getElementById(id);
 const nowSec = () => Date.now() / 1000;
 
 const state = { status: undefined, temp: undefined, presence: undefined, presenceChanged: undefined, alert: 'none',
-  away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null };
+  away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null };
 let client = null, everConnected = false, connected = false, ready = false;
 let view = 'home', guideDismissed = false, celebrating = false;
 let pending = null, dirty = false;                 // settings sent and waiting for the echo / person is editing
@@ -128,7 +129,24 @@ function updateGuide() {
   if (!guideDismissed && view !== 'guide' && !celebrating) setView('guide');
 }
 
-function render() { renderHome(); renderHealth(); renderSettings(); updateGuide(); }
+function renderAbout() {
+  const fw = state.info?.fw ?? state.health?.fw;
+  const v = describeVersions(APP_VERSION, fw);
+  $('footVersions').textContent = `Page ${APP_VERSION} · Board ${fw || '--'}`;
+  $('aPage').textContent = APP_VERSION;
+  $('aFw').textContent = fw || '--';
+  $('aBuild').textContent = formatBuild(state.info?.build);
+  $('aChip').textContent = state.info?.chip || '--';
+  $('aCore').textContent = state.info?.core || '--';
+  $('aFlash').textContent = state.info?.flash_kb ? `${Math.round(state.info.flash_kb / 1024)} MB` : '--';
+  $('aSketch').textContent = state.info?.sketch_kb ? `${state.info.sketch_kb} KB` : '--';
+  const box = $('vCompat');
+  box.replaceChildren();
+  if (v.level === 'ok') { const r = el('div', 'ok-banner', v.text); box.append(r); }
+  else box.append(alertBlock(v.level === 'warn' ? 'Versions differ' : 'Version unknown', v.text, v.level === 'warn' ? '' : 'warn'));
+}
+
+function render() { renderHome(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
 
 function handle(topic, buf) {
   const v = buf.toString();
@@ -142,6 +160,7 @@ function handle(topic, buf) {
   else if (t === 'state/led2' || t === 'state/led3') { const o = onOff(v); if (o !== null) state.led[t.slice(-1)] = o; }
   else if (t === 'health') state.health = json(buf);
   else if (t === 'settings') state.settings = json(buf);
+  else if (t === 'info') state.info = json(buf);
   else if (t === 'log/index') onLogIndex(json(buf));
   else if (t === 'log/data') onLogChunk(parseChunk(buf));
   else if (t === 'selftest') {

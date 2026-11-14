@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText } from '../logic.js';
+import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -161,4 +161,29 @@ test('describeSelfTest', () => {
 test('memoryText', () => {
   assert.equal(memoryText(14624), '14 KB');
   assert.equal(memoryText(undefined), '');
+});
+
+test('describeVersions same release is ok', () => {
+  assert.deepEqual(describeVersions('2.0.0', '2.0.0'), { level: 'ok', text: 'The page and the board are on the same release.' });
+  assert.equal(describeVersions('2.0.3', '2.0.0').level, 'ok');            // patch differences are compatible
+  assert.equal(describeVersions('2.0.0', '2.0.0-demo').level, 'ok');       // a suffix is ignored
+});
+test('describeVersions older and newer board', () => {
+  const older = describeVersions('2.1.0', '2.0.0');
+  assert.equal(older.level, 'warn');
+  assert.match(older.text, /older/);
+  const newer = describeVersions('2.0.0', '2.1.0-demo');
+  assert.equal(newer.level, 'warn');
+  assert.match(newer.text, /newer/);
+  assert.match(describeVersions('2.0.0', '1.9.0').text, /older/);
+});
+test('describeVersions unknown or malformed board version', () => {
+  assert.equal(describeVersions('2.0.0', undefined).level, 'unknown');
+  assert.equal(describeVersions('2.0.0', '').level, 'unknown');
+  assert.equal(describeVersions('2.0.0', 'banana').level, 'unknown');
+});
+test('formatBuild keeps a build stamp and handles missing', () => {
+  assert.equal(formatBuild('Nov 14 2026 22:41:05'), 'Nov 14 2026, 22:41');
+  assert.equal(formatBuild(undefined), '--');
+  assert.equal(formatBuild('weird'), 'weird');
 });

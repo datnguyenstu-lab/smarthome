@@ -11,7 +11,9 @@
 <body>
 <main>
   <section id="login">
+    <span class="logotile"><img src="assets/vetc-logo.png" alt="VETC" width="64" height="66"></span>
     <h1>Smart Home</h1>
+    <p class="sub left">School project</p>
     <form id="loginForm">
       <input id="user" placeholder="Username" autocomplete="username" required>
       <input id="pass" type="password" placeholder="Password" autocomplete="current-password" required>
@@ -44,6 +46,10 @@
       <button class="row navrow" id="guideLink" data-go="guide" hidden><span>Board offline: reconnect guide</span><span class="m">›</span></button>
       <button class="row navrow" data-go="health"><span id="healthLine">Health</span><span class="m">›</span></button>
       <button class="row navrow" data-go="settings"><span>Settings</span><span class="m">›</span></button>
+      <button class="foot" data-go="about" aria-label="About this software">
+        <img src="assets/vetc-logo.png" alt="" width="24" height="25">
+        <span id="footVersions">Smart Home</span><span class="m">About ›</span>
+      </button>
     </div>
 
     <!-- Health -->
@@ -86,6 +92,28 @@
       <h5>Wi-Fi</h5>
       <button class="btn ghost" id="setupBtn">Restart into setup mode</button>
       <p class="note">Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>
+    </div>
+
+    <!-- About -->
+    <div id="viewAbout" hidden>
+      <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>About</span></div>
+      <div class="aboutbrand">
+        <span class="logotile big"><img src="assets/vetc-logo.png" alt="VETC logo" width="96" height="100"></span>
+        <div><b>Smart Home</b><span class="sub left">School project · <a href="https://vetc.edu.vn/" target="_blank" rel="noopener">vetc.edu.vn</a></span></div>
+      </div>
+      <div id="vCompat"></div>
+      <h5>Software</h5>
+      <div class="row"><span>Page version</span><span class="m" id="aPage">--</span></div>
+      <div class="row"><span>Board firmware</span><span class="m" id="aFw">--</span></div>
+      <div class="row"><span>Firmware built</span><span class="m" id="aBuild">--</span></div>
+      <h5>Board</h5>
+      <div class="row"><span>Chip</span><span class="m" id="aChip">--</span></div>
+      <div class="row"><span>Platform core</span><span class="m" id="aCore">--</span></div>
+      <div class="row"><span>Flash memory</span><span class="m" id="aFlash">--</span></div>
+      <div class="row"><span>Firmware size</span><span class="m" id="aSketch">--</span></div>
+      <h5>Project</h5>
+      <div class="row"><span>Source code</span><span class="m"><a href="https://github.com/datnguyenstu-lab/smarthome" target="_blank" rel="noopener">GitHub</a></span></div>
+      <p class="note">Updates reach the board from a computer on its network; the page cannot change the firmware.</p>
     </div>
 
     <!-- Reconnect guide -->
