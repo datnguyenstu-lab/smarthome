@@ -1,56 +1,94 @@
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
-#include <WiFiClientSecure.h>
-#include <PubSubClient.h>
 #include <time.h>
-#include "secrets.h"
-#include "ca_cert.h"
+#include "alerts.h"
+#include "timing.h"
+#include "topics.h"
+#include "pins.h"
+#include "leds.h"
+#include "sensors.h"
+#include "net.h"
+#include "wifi_setup.h"
 
-BearSSL::WiFiClientSecure net;
-BearSSL::X509List ca(CA_CERT);
-PubSubClient mqtt(net);
+using namespace logic;
 
-void onMsg(char* topic, byte* payload, unsigned int len) {
-  Serial.printf("RX %s: %.*s\n", topic, len, (char*)payload);
+static Debouncer btn1(30), btn2(30);
+static LongPress btn1Long(5000);
+static PresenceHold presenceHold(5000);
+static bool btn1Prev = false, btn2Prev = false;
+static bool presence = false, away = false;
+static float lastTemp = NAN;
+static Alert alert = Alert::None;
+static uint32_t lastTempMs = 0;
+
+static void pub(const char* topic, const char* v) { net::publish(topic, v, true); }
+
+static void publishLed(int n) { pub(ledStateTopic(n), leds::get(n) ? "on" : "off"); }
+
+static void publishAlertIfChanged(bool force = false) {
+  Alert a = evalAlert(lastTemp, away, presence, alert);
+  if (a != alert || force) { alert = a; pub(T_ALERT, alertName(a)); }
 }
 
-void connectMqtt() {
-  while (!mqtt.connected()) {
-    Serial.print("MQTT connecting... ");
-    String id = "esp8266-" + String(ESP.getChipId(), HEX);
-    if (mqtt.connect(id.c_str(), MQTT_USER, MQTT_PASS, "smarthome/status", 0, true, "offline")) {
-      Serial.println("ok");
-      mqtt.publish("smarthome/status", "online", true);
-      mqtt.subscribe("smarthome/cmd/#");
-    } else {
-      char err[128];
-      net.getLastSSLError(err, sizeof(err));
-      Serial.printf("failed, rc=%d, ssl: %s\n", mqtt.state(), err);
-      delay(5000);
-    }
-  }
+static void setLed(int n, bool on) { leds::set(n, on); publishLed(n); }
+
+static void setAway(bool on) {
+  away = on;
+  pub(T_STATE_AWAY, on ? "on" : "off");
+  publishAlertIfChanged();
+}
+
+static void readTemp() {
+  lastTemp = sensors::readTempC();
+  if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
+  publishAlertIfChanged();
+}
+
+static void publishPresence(bool changed) {
+  pub(T_PRESENCE, presence ? "1" : "0");
+  if (changed) { char b[16]; snprintf(b, sizeof(b), "%ld", (long)time(nullptr)); pub(T_PRESENCE_CHANGED, b); }
+}
+
+static void onConnected() {  // after every (re)connect: republish everything from RAM
+  for (int n = 1; n <= 3; n++) publishLed(n);
+  pub(T_STATE_AWAY, away ? "on" : "off");
+  publishPresence(false);
+  if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
+  publishAlertIfChanged(true);
+}
+
+static void onCommand(const char* topic, const char* payload, unsigned len) {
+  bool on;
+  int n = ledFromCmdTopic(topic);
+  if (n) { if (parseOnOff(payload, len, on)) setLed(n, on); return; }
+  if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
 }
 
 void setup() {
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print('.'); }
-  Serial.printf("\nWi-Fi OK, IP %s\n", WiFi.localIP().toString().c_str());
-
-  configTime(0, 0, "time.google.com", "pool.ntp.org");  // TLS cert check needs the real time
-  Serial.print("NTP");
-  uint32_t t0 = millis();
-  while (time(nullptr) < 1700000000 && millis() - t0 < 30000) { delay(300); Serial.print('.'); }
-  if (time(nullptr) < 1700000000) { Serial.println(" FAILED, restarting"); delay(500); ESP.restart(); }
-  Serial.printf(" ok, epoch %ld\n", (long)time(nullptr));
-
-  net.setTrustAnchors(&ca);
-  mqtt.setServer(MQTT_HOST, MQTT_PORT);
-  mqtt.setCallback(onMsg);
+  pinMode(PIN_BTN1, INPUT_PULLUP);
+  pinMode(PIN_BTN2, INPUT_PULLUP);
+  leds::begin();
+  sensors::begin();
+  lastTemp = sensors::readTempC();
+  net::onMessage(onCommand);
+  net::onConnect(onConnected);
+  net::begin();
+  Serial.println("Ready");
 }
 
 void loop() {
-  if (!mqtt.connected()) connectMqtt();
-  mqtt.loop();
+  net::loop();
+  uint32_t now = millis();
+
+  bool b1 = btn1.update(digitalRead(PIN_BTN1) == LOW, now);
+  bool b2 = btn2.update(digitalRead(PIN_BTN2) == LOW, now);
+  if (b1 && !btn1Prev) setLed(1, !leds::get(1));
+  if (b2 && !btn2Prev) setLed(2, !leds::get(2));
+  btn1Prev = b1; btn2Prev = b2;
+  if (btn1Long.update(b1, now)) wifiSetup::startPortal();
+
+  bool p = presenceHold.update(sensors::irDetected(), now);
+  if (p != presence) { presence = p; publishPresence(true); publishAlertIfChanged(); }
+
+  if (now - lastTempMs >= 30000) { lastTempMs = now; readTemp(); }
 }
