@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild } from '../logic.js';
+import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -186,4 +186,23 @@ test('formatBuild keeps a build stamp and handles missing', () => {
   assert.equal(formatBuild('Nov 14 2026 22:41:05'), 'Nov 14 2026, 22:41');
   assert.equal(formatBuild(undefined), '--');
   assert.equal(formatBuild('weird'), 'weird');
+});
+
+test('describeAbout accepts the four fields and trims them', () => {
+  assert.deepEqual(describeAbout({ name: '  Ann Lee ', student_id: '123', class: 'C1', year: '2026-2027' }),
+    { name: 'Ann Lee', studentId: '123', className: 'C1', year: '2026-2027' });
+});
+test('describeAbout keeps what is there and drops the rest', () => {
+  assert.deepEqual(describeAbout({ name: 'Ann', extra: 'x', student_id: 42 }), { name: 'Ann', studentId: '', className: '', year: '' });
+});
+test('describeAbout returns null when there is nothing to show', () => {
+  assert.equal(describeAbout(undefined), null);
+  assert.equal(describeAbout(null), null);
+  assert.equal(describeAbout('text'), null);
+  assert.equal(describeAbout([]), null);
+  assert.equal(describeAbout({}), null);
+  assert.equal(describeAbout({ name: '   ' }), null);
+});
+test('describeAbout cuts very long values', () => {
+  assert.equal(describeAbout({ name: 'x'.repeat(200) }).name.length, 60);
 });

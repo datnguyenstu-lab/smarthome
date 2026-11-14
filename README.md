@@ -62,6 +62,15 @@ powershell -File tools\demo_ota.ps1 -Version 2.0.0        # back to the first im
 
 The About screen (Home, bottom row) shows the page and board versions, the firmware build time, chip, core and flash size, and warns when the board runs a different release than the page, which is what you will see during the demo (page 2.0.0, board 2.1.0-demo). The Health page, the `health` message (`fw`) and the event log (`boot ... fw=<version>`, plus `ota start` and `ota end`) all show the change. Over-the-air updates work only from the computer on the same network; there is no update from the web page (see the design notes for why).
 
+## Private files and moving to a new computer
+
+Two files are never committed in plain form (they are git-ignored): `include/secrets.h` (passwords) and `include/about.json` (the student details shown on the About screen). They are kept in the repository only **encrypted** in `private/`, so a clone on a new computer can restore them.
+
+- **Lock** (after you change either file): `python tools/vault.py lock`, enter a long passphrase (12+ characters, not reused), then commit `private/*.enc`.
+- **New computer:** clone the repository, `pip install cryptography paho-mqtt platformio`, run `python tools/vault.py unlock` and type the passphrase. Then build and flash as above.
+- **About details:** `python tools/publish_about.py` publishes them as the retained message `smarthome/about`. The page shows them only after login, so they are not in the public page source.
+- **Keep the passphrase safe.** Without it the encrypted files cannot be opened; with a weak one, anyone can try passphrases against a public repository.
+
 ## Wi-Fi setup mode
 
 - **From the board:** hold button 1 (D1) for 5 seconds. The yellow light fast-blinks.

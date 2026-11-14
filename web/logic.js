@@ -150,3 +150,12 @@ export function formatBuild(stamp) {
   const m = /^(\w{3} +\d{1,2} \d{4}) (\d{2}:\d{2}):\d{2}$/.exec(stamp);
   return m ? `${m[1]}, ${m[2]}` : stamp;
 }
+
+// The About details (student name, id, class, year) come from the retained smarthome/about message, so
+// they are not in the public page source. Only the four known text fields are kept, trimmed and cut to 60.
+export function describeAbout(obj) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+  const t = (v) => (typeof v === 'string' ? v.trim().slice(0, 60) : '');
+  const out = { name: t(obj.name), studentId: t(obj.student_id), className: t(obj.class), year: t(obj.year) };
+  return out.name || out.studentId || out.className || out.year ? out : null;
+}

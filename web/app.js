@@ -1,5 +1,5 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
-  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild } from './logic.js';
+  formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
@@ -11,7 +11,7 @@ const $ = (id) => document.getElementById(id);
 const nowSec = () => Date.now() / 1000;
 
 const state = { status: undefined, temp: undefined, presence: undefined, presenceChanged: undefined, alert: 'none',
-  away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null };
+  away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null, about: null };
 let client = null, everConnected = false, connected = false, ready = false;
 let view = 'home', guideDismissed = false, celebrating = false;
 let pending = null, dirty = false;                 // settings sent and waiting for the echo / person is editing
@@ -140,6 +140,13 @@ function renderAbout() {
   $('aCore').textContent = state.info?.core || '--';
   $('aFlash').textContent = state.info?.flash_kb ? `${Math.round(state.info.flash_kb / 1024)} MB` : '--';
   $('aSketch').textContent = state.info?.sketch_kb ? `${state.info.sketch_kb} KB` : '--';
+  const who = state.about;  // from the retained smarthome/about message; hidden when it is not published
+  $('aStudent').hidden = !who;
+  if (who) {
+    for (const [id, v] of [['aName', who.name], ['aId', who.studentId], ['aClass', who.className], ['aYear', who.year]]) {
+      $(id).textContent = v; $(id).parentElement.hidden = !v;
+    }
+  }
   const box = $('vCompat');
   box.replaceChildren();
   if (v.level === 'ok') { const r = el('div', 'ok-banner', v.text); box.append(r); }
@@ -161,6 +168,7 @@ function handle(topic, buf) {
   else if (t === 'health') state.health = json(buf);
   else if (t === 'settings') state.settings = json(buf);
   else if (t === 'info') state.info = json(buf);
+  else if (t === 'about') state.about = describeAbout(json(buf));
   else if (t === 'log/index') onLogIndex(json(buf));
   else if (t === 'log/data') onLogChunk(parseChunk(buf));
   else if (t === 'selftest') {
