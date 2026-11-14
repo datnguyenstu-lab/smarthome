@@ -21,8 +21,8 @@ static uint32_t lastTry = 0;
 
 static void relay(char* topic, byte* payload, unsigned len) {
   if (!msgCb) return;
-  char buf[64];
-  if (len >= sizeof(buf)) return;  // commands are tiny; anything bigger is garbage
+  char buf[256];
+  if (len >= sizeof(buf)) return;  // commands are small (settings JSON is about 70 bytes); bigger is garbage
   memcpy(buf, payload, len);
   buf[len] = '\0';
   msgCb(topic, buf, len);
@@ -55,6 +55,7 @@ void begin() {
   tls.setTrustAnchors(&ca);
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setKeepAlive(30);
+  mqtt.setBufferSize(512);  // default 256 is too small for the health JSON
   mqtt.setCallback(relay);
 
   ArduinoOTA.setHostname("smarthome-node");

@@ -8,12 +8,16 @@
 #include "sensors.h"
 #include "net.h"
 #include "wifi_setup.h"
+#include "settings.h"
+#include "settings_store.h"
 
 using namespace logic;
 
 static Debouncer btn1(30), btn2(30);
 static LongPress btn1Long(5000);
 static PresenceHold presenceHold(5000);
+static Settings settings;
+static uint32_t connectMs = 0;
 static bool btn1Prev = false, btn2Prev = false;
 static bool presence = false, away = false;
 static float lastTemp = NAN;
@@ -24,8 +28,19 @@ static void pub(const char* topic, const char* v) { net::publish(topic, v, true)
 
 static void publishLed(int n) { pub(ledStateTopic(n), leds::get(n) ? "on" : "off"); }
 
+static void applySettings() { presenceHold.setHoldMs(settings.presenceHoldS * 1000UL); }
+
+static void publishSettings() {
+  char b[96];
+  if (formatSettings(settings, b, sizeof(b))) pub(T_SETTINGS, b);
+}
+
+static bool sameSettings(const Settings& a, const Settings& b) {
+  return a.hotOnC == b.hotOnC && a.presenceHoldS == b.presenceHoldS && a.statusLed == b.statusLed;
+}
+
 static void publishAlertIfChanged(bool force = false) {
-  Alert a = evalAlert(lastTemp, away, presence, alert);
+  Alert a = evalAlert(lastTemp, away, presence, alert, settings.hotOnC);
   if (a != alert || force) { alert = a; pub(T_ALERT, alertName(a)); }
 }
 
@@ -50,6 +65,8 @@ static void publishPresence(bool changed) {
 }
 
 static void onConnected() {  // after every (re)connect: republish everything from RAM
+  connectMs = millis();
+  publishSettings();
   for (int n = 1; n <= 3; n++) publishLed(n);
   pub(T_STATE_AWAY, away ? "on" : "off");
   publishPresence(false);
@@ -61,6 +78,19 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
   bool on;
   int n = ledFromCmdTopic(topic);
   if (n) { if (parseOnOff(payload, len, on)) setLed(n, on); return; }
+  if (strcmp(topic, T_CMD_SETTINGS) == 0) {
+    Settings s = settings;
+    if (parseSettings(payload, len, s) && !sameSettings(s, settings)) {
+      settings = s;
+      applySettings();
+      settingsStore::save(settings);  // only when something changed: the echo never writes flash
+      publishAlertIfChanged();
+    }
+    publishSettings();  // the echo shows what the board really holds
+    return;
+  }
+  // A retained cmd/setup arrives right after connecting; ignore that so it cannot boot-loop the board.
+  if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
 }
 
@@ -70,6 +100,8 @@ void setup() {
   pinMode(PIN_BTN2, INPUT_PULLUP);
   leds::begin();
   sensors::begin();
+  settings = settingsStore::load();
+  applySettings();
   lastTemp = sensors::readTempC();
   net::onMessage(onCommand);
   net::onConnect(onConnected);
