@@ -67,6 +67,15 @@ test('isStale missing ts', () => {
 });
 test('guideState hung when online but silent', () => assert.equal(guideState({ status: 'online', healthTs: 100, nowSec: 1000 }), 'hung'));
 test('guideState ok', () => assert.equal(guideState({ status: 'online', healthTs: 990, nowSec: 1000 }), 'ok'));
+test('guideState uses the live arrival time, so a wrong phone clock cannot trigger it', () => {
+  // the retained health message is hours old by the board's clock, but a live one just arrived
+  assert.equal(guideState({ status: 'online', healthTs: 100, nowSec: 1000, liveAtSec: 995 }), 'ok');
+});
+test('guideState hung when the live heartbeat stopped', () => {
+  assert.equal(guideState({ status: 'online', healthTs: 990, nowSec: 1000, liveAtSec: 900 }), 'hung');
+  assert.equal(guideState({ status: 'online', healthTs: 990, nowSec: 1060, liveAtSec: 1000 }), 'ok');
+  assert.equal(guideState({ status: 'online', healthTs: 990, nowSec: 1061, liveAtSec: 1000 }), 'hung');
+});
 test('guideState offline', () => {
   assert.equal(guideState({ status: 'offline', healthTs: 990, nowSec: 1000 }), 'offline');
   assert.equal(guideState({ status: undefined, healthTs: 990, nowSec: 1000 }), 'offline');

@@ -54,8 +54,12 @@ export function isStale(nowSec, healthTs, status) {
   return nowSec - healthTs > STALE_AFTER_S;
 }
 
-export function guideState({ status, healthTs, nowSec }) {
+// `liveAtSec` is when a non-retained health message last arrived at the page (the page's own clock, so a wrong
+// phone clock cannot cause a false alarm). Before the first live message only the retained one's own timestamp
+// is available, so that is used.
+export function guideState({ status, healthTs, nowSec, liveAtSec }) {
   if (status !== 'online') return 'offline';
+  if (typeof liveAtSec === 'number') return nowSec - liveAtSec > STALE_AFTER_S ? 'hung' : 'ok';
   return isStale(nowSec, healthTs, status) ? 'hung' : 'ok';
 }
 
