@@ -71,7 +71,8 @@ static void publishPresence(bool changed) {
 // attention. It is not a light the person controls.
 static void driveStatusLed(bool setupMode) {
   static Pattern prev = Pattern::None;
-  Pattern p = pickPattern(setupMode, net::wifiUp(), net::connected(), healthMonitor::issues(), settings.statusLed);
+  Pattern p = pickPattern(setupMode, net::wifiUp(), net::connected(), healthMonitor::issues(), settings.statusLed,
+                      healthMonitor::selfTestRunning());
   if (p != Pattern::None) leds::drive(1, patternLevel(p, millis()));
   else if (prev != Pattern::None) leds::drive(1, false);
   prev = p;
@@ -105,7 +106,7 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
   }
   // A retained cmd/setup or cmd/selftest arrives right after connecting; ignore that so it cannot boot-loop the board.
   if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
-  if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(true); return; }
+  if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(3000); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
 }
 
@@ -117,8 +118,9 @@ void setup() {
   sensors::begin();
   settings = settingsStore::load();
   applySettings();
-  lastTemp = sensors::readTempC();
   wifiSetup::onTick([]() { driveStatusLed(true); });
+  healthMonitor::onTick([]() { driveStatusLed(false); });
+  lastTemp = healthMonitor::selfTestAtBoot();  // yellow LED shows the self-test pattern for about 2 s
   net::onMessage(onCommand);
   net::onConnect(onConnected);
   net::begin();

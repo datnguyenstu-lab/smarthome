@@ -14,7 +14,6 @@ namespace healthMonitor {
 static const char* FW = "2.0.0";
 static uint8_t mask = 0;
 static uint32_t lastPubMs = 0;
-static bool pendingBootTest = true;
 static logic::HealthInputs in;
 
 static const char* resetName() {
@@ -52,21 +51,53 @@ void publishNow() {
   if (logic::formatHealth(r, buf, sizeof(buf)) && net::publish(logic::T_HEALTH, buf, true)) lastPubMs = millis();
 }
 
-void runSelfTest(bool blinkLeds) {
-  bool tempOk = logic::tempValid(sensors::readTempC());
-  bool irOk = !(mask & logic::ISSUE_IR_STUCK);
-  if (blinkLeds) {
-    for (int n = 1; n <= 3; n++) {
-      leds::drive(n, true); delay(300);
-      leds::drive(n, leds::get(n));  // back to the state the person set
-    }
+static void (*tickCb)() = nullptr;
+static bool running = false;
+static bool bootPending = false, bootTempOk = true;
+
+void onTick(void (*cb)()) { tickCb = cb; }
+bool selfTestRunning() { return running; }
+
+// Keeps the pattern going until `ms` have passed since t0.
+static void holdPattern(uint32_t t0, uint32_t ms) {
+  while (millis() - t0 < ms) {
+    if (tickCb) tickCb();
+    delay(5);
   }
-  char buf[320];
+}
+
+static void publishSelfTest(bool tempOk) {
+  bool irOk = !(mask & logic::ISSUE_IR_STUCK);
+  bool wifiOk = net::wifiUp() && WiFi.RSSI() >= logic::RSSI_WEAK_DBM;
+  char buf[256];
   snprintf(buf, sizeof(buf),
-           "{\"ts\":%lu,\"checks\":[{\"name\":\"temp\",\"ok\":%s},{\"name\":\"ir\",\"ok\":%s},{\"name\":\"leds\",\"ok\":true},{\"name\":\"wifi\",\"ok\":%s},{\"name\":\"cloud\",\"ok\":%s}]}",
-           (unsigned long)time(nullptr), tempOk ? "true" : "false", irOk ? "true" : "false",
-           net::wifiUp() && WiFi.RSSI() >= logic::RSSI_WEAK_DBM ? "true" : "false", net::connected() ? "true" : "false");
+           "{\"ts\":%lu,\"checks\":[{\"name\":\"temp\",\"ok\":%s},{\"name\":\"ir\",\"ok\":%s},{\"name\":\"wifi\",\"ok\":%s},{\"name\":\"cloud\",\"ok\":%s}]}",
+           (unsigned long)time(nullptr), tempOk ? "true" : "false", irOk ? "true" : "false", wifiOk ? "true" : "false",
+           net::connected() ? "true" : "false");
   net::publish(logic::T_SELFTEST, buf, true);
+}
+
+float selfTestAtBoot() {
+  running = true;
+  uint32_t t0 = millis();
+  if (tickCb) tickCb();                 // pattern starts before the 750 ms sensor read blocks
+  float t = sensors::readTempC();
+  bootTempOk = logic::tempValid(t);
+  holdPattern(t0, 2000);
+  running = false;
+  leds::drive(1, false);                // Wi-Fi setup follows and does not tick; leave the LED dark
+  bootPending = true;                   // published after the first MQTT connect
+  return t;
+}
+
+void runSelfTest(uint32_t patternMs) {
+  running = true;
+  uint32_t t0 = millis();
+  if (tickCb) tickCb();
+  bool tempOk = logic::tempValid(sensors::readTempC());
+  publishSelfTest(tempOk);
+  holdPattern(t0, patternMs);
+  running = false;
 }
 
 void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs) {
@@ -81,7 +112,7 @@ void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs) {
   bool changed = m != mask;
   mask = m;
   if (net::connected() && (changed || lastPubMs == 0 || nowMs - lastPubMs >= 60000)) publishNow();
-  if (pendingBootTest && net::connected()) { pendingBootTest = false; runSelfTest(false); }
+  if (bootPending && net::connected()) { bootPending = false; publishSelfTest(bootTempOk); }
 }
 
 }  // namespace healthMonitor

@@ -58,7 +58,30 @@ static void test_pattern_level_defined_at_millis_wrap() {
   TEST_ASSERT_TRUE(patternLevel(Pattern::SetupFast, 0));
 }
 
+static void test_self_test_beats_wifi_cloud_and_issue() {
+  ASSERT_PATTERN(Pattern::SelfTest, pickPattern(false, false, false, 1, true, true));
+  ASSERT_PATTERN(Pattern::SelfTest, pickPattern(false, true, false, 1, true, true));
+  ASSERT_PATTERN(Pattern::SelfTest, pickPattern(false, true, true, 1, true, true));
+}
+static void test_setup_beats_self_test() {
+  ASSERT_PATTERN(Pattern::SetupFast, pickPattern(true, true, true, 0, true, true));
+}
+static void test_self_test_shows_even_when_disabled() {
+  ASSERT_PATTERN(Pattern::SelfTest, pickPattern(false, true, true, 0, false, true));
+}
+static void test_self_test_levels() {
+  TEST_ASSERT_TRUE(patternLevel(Pattern::SelfTest, 250));
+  TEST_ASSERT_FALSE(patternLevel(Pattern::SelfTest, 550));
+  TEST_ASSERT_TRUE(patternLevel(Pattern::SelfTest, 650));
+  TEST_ASSERT_FALSE(patternLevel(Pattern::SelfTest, 750));
+  TEST_ASSERT_TRUE(patternLevel(Pattern::SelfTest, 800));
+}
+
 void run_statusled_tests() {
+  RUN_TEST(test_self_test_beats_wifi_cloud_and_issue);
+  RUN_TEST(test_setup_beats_self_test);
+  RUN_TEST(test_self_test_shows_even_when_disabled);
+  RUN_TEST(test_self_test_levels);
   RUN_TEST(test_setup_beats_everything);
   RUN_TEST(test_no_wifi_beats_cloud_down);
   RUN_TEST(test_cloud_down_beats_issue);
