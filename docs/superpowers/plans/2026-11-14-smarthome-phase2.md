@@ -10,7 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-14-smarthome-phase2-design.md` (Phase 1 spec: `2026-11-14-smarthome-design.md`)
 
+**Execution order:** 1 to 8, then 12 (self-test pattern), then 9 (web UI), then 11 (event log, firmware and download button), then 10 (accounts and release). Tasks 11 and 12 were added at the owner's request after the first plan.
+
 ## Global Constraints
+
+- Event log: plain text lines, rotating files `/log_<n>.txt`, `LOG_MAX_BYTES` 65536 per file (a constant, a test build may lower it), newest 3 files kept, never compressed on the board; log chunks at most 384 bytes of data per MQTT message; topics `smarthome/cmd/log` (not retained), `smarthome/log/index` and `smarthome/log/data` (not retained).
+- Self-test pattern on the yellow LED: 800 ms period, on 0-500, off 500-600, on 600-700, off 700-800; shown for about 2 s at boot and about 3 s on `cmd/selftest`; shows even when `status_led` is off.
 
 - Existing topics and behaviour do not change: `temp`, `presence`, `presence_changed`, `alert`, `status`, `state/led1..3`, `state/away`, `cmd/led1..3`, `cmd/away`.
 - Pins (do not change): IR D0, BTN1 D1 (toggles Light 2), DS18B20 D2, BTN2 D4 (toggles Light 3), LEDs `{D7, D6, D5}` = Light 1 right, Light 2 middle, Light 3 yellow.
@@ -28,6 +33,8 @@
 3. When a status pattern ends, Light 3 returns to the on/off state the person set, not whatever the pattern left.
 4. A retained `health` message from hours ago must not make the page think the board is alive: staleness uses the message's own `ts`.
 5. Counters and windows survive the `millis()` wrap (about 49 days) without false issues.
+6. The event log can never fill the flash (settings keep their space), a half-written last line after a power cut is not served, a failed log write never stalls sensors, buttons or MQTT, and flapping Wi-Fi cannot write the flash on every event (batched flushes).
+7. Log download survives a lost or duplicated chunk, a second `get` while one is streaming, and an unknown file number, without hanging the board or the page.
 
 ---
 
@@ -234,3 +241,49 @@
 - [ ] **Step 4:** OTA check: `PLATFORMIO_UPLOAD_FLAGS="--auth=<OTA_PASS>" pio run -e ota -t upload` succeeds with the board on Wi-Fi; a wrong password is refused.
 - [ ] **Step 5:** write `README.md`: what it is, wiring table, flashing by USB (Step 0 findings: hold FLASH only if the upload times out), OTA, setup mode, accounts and ACLs, settings, health and issues, hosting on GitHub Pages (`git subtree push --prefix web origin gh-pages`). Then, **after the owner says yes (this publishes)**, push `main` and update `gh-pages`.
 - [ ] **Step 6: Commit** `docs: README and release of Phase 2`.
+
+### Task 11: Event log on the board and download from the page
+
+**Files:**
+- Create: `lib/logic/logfmt.h`, `lib/logic/logfmt.cpp`, `test/test_native/test_logfmt.cpp`, `src/event_log.h`, `src/event_log.cpp`, `web/logsync.js`, `web/test/logsync.test.mjs`, `tools/pull_log.py`
+- Modify: `lib/logic/topics.h`, `test/test_native/test_main.cpp`, `src/main.cpp`, `src/net.cpp`, `src/health_monitor.cpp`, `src/wifi_setup.cpp`, `web/app.js` and `web/index.html` (Download log button on the Health view, after Task 9)
+
+**Interfaces:**
+- Produces (`lib/logic/logfmt.h`, namespace `logic`):
+  - `size_t formatLogLine(char* buf, size_t cap, uint32_t epoch, uint32_t uptimeS, const char* code, const char* detail)`: `"<epoch> <code> <detail>\n"` when `epoch >= 1700000000`, else `"+<uptimeS> <code> <detail>\n"`; `\r` and `\n` inside `detail` become spaces; `detail` is cut to fit; an empty detail gives `"<ts> <code>\n"`; returns 0 when `cap` is under 24.
+  - `struct LogRotation { uint32_t maxBytes; int keep; bool needRotate(uint32_t currentBytes, uint32_t lineLen) const; bool seqToDelete(uint32_t newSeq, uint32_t& out) const; }` (`needRotate` true when `currentBytes + lineLen > maxBytes` and `currentBytes > 0`; `seqToDelete` gives `newSeq - keep` when `newSeq >= keep`, else false).
+  - `size_t trimToLastLine(const char* buf, size_t len)`: length up to and including the last `\n`, 0 when none.
+  - `size_t formatChunkHeader(char* buf, size_t cap, uint32_t seq, uint32_t offset, uint32_t total)`: `"<seq>:<offset>:<total>\n"`.
+  - Topic constants `T_CMD_LOG "smarthome/cmd/log"`, `T_LOG_INDEX "smarthome/log/index"`, `T_LOG_DATA "smarthome/log/data"`.
+- Produces (`src/event_log.h`): `namespace eventLog { void begin(); void add(const char* code, const char* detail); void tick(uint32_t nowMs); void handleCommand(const char* payload, unsigned len); }`.
+- Produces (`web/logsync.js`): `parseChunk(text) -> {seq, offset, total, data} | null`; `class LogAssembler { constructor(total); accept(chunk) -> boolean (true when new data was added); nextOffset() -> number; done() -> boolean; text() -> string }` (accepts duplicates harmlessly, ignores a chunk that does not start at `nextOffset()` and reports the gap through `nextOffset()`); `requestMessage(kind, seq?, offset?) -> string` giving `{"list":1}` or `{"get":<seq>,"offset":<n>}`.
+
+- [ ] **Step 1: Write failing native tests** (`run_logfmt_tests()`):
+  - `line_uses_epoch_when_clock_is_set`, `line_uses_uptime_before_clock`, `line_empty_detail_has_no_trailing_space`, `line_newlines_in_detail_become_spaces`, `line_long_detail_is_cut_and_still_ends_with_newline`, `line_returns_zero_when_buffer_tiny`
+  - `rotate_when_next_line_would_exceed`, `no_rotate_on_empty_file_even_if_line_is_big`, `delete_seq_is_new_minus_keep`, `no_delete_while_fewer_than_keep`
+  - `trim_drops_partial_last_line`, `trim_keeps_complete_lines`, `trim_no_newline_is_zero`
+  - `chunk_header_exact_string` (`"3:768:65000\n"`).
+- [ ] **Step 2: Write failing web tests** (`logsync.test.mjs`): `parseChunk reads header and data`, `parseChunk rejects garbage`, `assembler joins in-order chunks and reports done`, `assembler ignores duplicate chunk`, `assembler reports the gap and nextOffset stays at the gap`, `assembler recovers when the missing chunk arrives`, `assembler handles multi-byte characters by byte offsets` (offsets count UTF-8 bytes), `requestMessage list and get`.
+- [ ] **Step 3: Run** `pio test -e native` and `node --test "web/test/*.test.mjs"`. Expected: FAIL (missing symbols).
+- [ ] **Step 4: Implement** `logfmt` and `logsync.js`. Run both suites. Expected: all PASS.
+- [ ] **Step 5: Implement the firmware.** `eventLog` keeps files `/log_<n>.txt` on LittleFS: at boot it finds the highest `n` (creating `/log_1.txt` when none), appends lines through a RAM buffer of 512 bytes flushed at most every 5 s (immediately for `boot` and `crash` codes), rotates with `LogRotation{LOG_MAX_BYTES, 3}`, deletes the oldest file, and skips writing when LittleFS free space is under 32 KB. `handleCommand`: `{"list":1}` publishes `smarthome/log/index` as `{"files":[{"seq":2,"bytes":12345},...],"max_file_bytes":65536}` (oldest first); `{"get":<seq>,"offset":<n>}` starts one stream (a new `get` replaces the old one; an unknown seq or an offset beyond the end publishes an empty-data chunk header so the page can stop); `tick` sends one chunk of at most 384 data bytes every 25 ms, never serving the partial last line of the newest file (`trimToLastLine`). Add `eventLog::add` calls: boot (reset reason and fw), Wi-Fi lost and regained, MQTT lost and regained, issue raised and cleared (names from `issueName`), settings changed (the echoed JSON), self-test result (pass or the failing check names), setup mode entered and left, OTA start and end. In `main.cpp` route `cmd/log` to `eventLog::handleCommand` and call `eventLog::tick` every loop.
+- [ ] **Step 6: Write `tools/pull_log.py`**: asks for `list`, then `get`s every file from offset 0, re-requests the first missing offset after 3 s of silence, writes the joined text to a file and prints the line count. Compile `pio run -e nodemcuv2`. Expected: SUCCESS.
+- [ ] **Step 7: Flash and verify on the board:** `python tools/pull_log.py` returns a text file whose first lines show the boot line and the Wi-Fi and MQTT connect lines; change a setting (`watch.py`) and run `cmd/selftest`: the next pull shows a `settings` line and a `selftest` line; pull while the file is growing returns only complete lines. **Rotation test:** build once with `-DLOG_MAX_BYTES=2048`, flash, send `cmd/selftest` about 60 times, pull: the index shows exactly 3 files, sequence numbers increase, the oldest is gone, and total size is under 3 x 2048 plus one line; then reflash the normal build. **Power cut:** unplug USB during a burst of events, replug: the log still downloads and has no partial last line.
+- [ ] **Step 8: Add the Download log button** (Health view): collects the index, requests files oldest to newest with the retry rule, shows progress ("2 of 3 files"), joins the text, gzips with `CompressionStream` when the browser has it, otherwise saves plain text, names the file `smarthome-log-<yyyymmdd-hhmm>.txt(.gz)`, and shows a plain error with a Try again button after 3 failed retries. Verify with the headless browser against `localhost` (button present, disabled while offline) and with the owner at the phone.
+- [ ] **Step 9: Commit** `feat: event log on the board with chunked download`.
+
+### Task 12: Self-test pattern on the yellow LED
+
+**Files:**
+- Modify: `lib/logic/statusled.h`, `lib/logic/statusled.cpp`, `test/test_native/test_statusled.cpp`, `src/health_monitor.h`, `src/health_monitor.cpp`, `src/main.cpp`
+
+**Interfaces:**
+- Produces: `Pattern::SelfTest`; `Pattern pickPattern(bool setupMode, bool wifiUp, bool mqttUp, uint8_t issues, bool statusLedEnabled, bool selfTestRunning = false)` (priority: SetupFast > SelfTest > NoWifi > CloudDown > Issue; SelfTest shows even when `statusLedEnabled` is false); `healthMonitor::selfTestAtBoot()` (runs the checks and the pattern for about 2 s; the result is published after the first MQTT connect) and `healthMonitor::runSelfTest(uint32_t patternMs)` (replaces `runSelfTest(bool)`; about 3000 from the command; publishes at once); `healthMonitor::selfTestRunning()`; `healthMonitor::onTick(void (*cb)())` called while a self-test blocks, so the LED keeps blinking.
+
+- [ ] **Step 1: Write failing tests** in `test_statusled.cpp`: `self_test_beats_wifi_cloud_and_issue`, `setup_beats_self_test`, `self_test_shows_even_when_disabled`, `self_test_levels` (on at 250, off at 550, on at 650, off at 750, on at 800), and the existing tests stay unchanged (default argument).
+- [ ] **Step 2: Run** `pio test -e native`. Expected: FAIL.
+- [ ] **Step 3: Implement** the enum value, `pickPattern` parameter and `patternLevel` case (`nowMs % 800`). Run `pio test -e native`. Expected: all PASS.
+- [ ] **Step 4: Firmware.** Remove the three-LED blink and the `leds` check from the self-test JSON (checks become `temp`, `ir`, `wifi`, `cloud`). `selfTestAtBoot()` is called in `setup()` before `net::begin()`: it reads the temperature, runs the pattern for about 2 s through `onTick`, and stores the result for publishing after the first connect. `cmd/selftest` runs `runSelfTest(3000)` (still ignored within 3 s after an MQTT connect). `driveStatusLed` passes `healthMonitor::selfTestRunning()` to `pickPattern`.
+- [ ] **Step 5: Compile** `pio run -e nodemcuv2`. Expected: SUCCESS.
+- [ ] **Step 6: Flash and verify with the owner at the board:** after power-up the yellow LED shows the long-short pattern for about 2 s, then Light 3's state or the normal status pattern; `tools/watch.py 8 'smarthome/cmd/selftest=1'` shows the same pattern for about 3 s and a `selftest` result with four checks; with `status_led` set to false the self-test pattern still shows; Light 3 returns to its set state afterwards.
+- [ ] **Step 7: Commit** `feat: self-test pattern on the yellow LED at boot and on command`.

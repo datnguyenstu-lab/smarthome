@@ -19,6 +19,7 @@ Phase 1 works but is a demo: when something goes wrong you need a serial cable, 
 - Not in this phase: push notifications, humidity sensor, battery or sleep, several boards, user roles beyond "logged in".
 - The page cannot change Wi-Fi on a board that is offline. It can only guide the person, or restart an online board into setup mode.
 - No silent failure: every fault the board can detect must reach the page.
+- Not in this phase: compressing logs on the board, a live log stream, log search or filters on the page.
 - No secret in the web files. A bad or malicious setting value must never brick the board.
 
 ## Decided by the owner
@@ -38,7 +39,7 @@ Phase 1 works but is a demo: when something goes wrong you need a serial cable, 
   - `wifi_unstable`: more than 3 Wi-Fi or MQTT reconnects in 10 min.
   - `low_memory`: free heap below 10 kB.
   - `crash_reboot`: last reset reason was an exception or watchdog (cleared after one clean hour).
-- `smarthome/cmd/selftest` (not retained) runs the self-test now: reads the sensors, blinks the three LEDs in turn, then publishes `smarthome/selftest` (retained JSON: per-check pass or fail with a short cause). A short self-test also runs at boot.
+- `smarthome/cmd/selftest` (not retained) runs the self-test now: reads the sensors, shows the self-test pattern on the yellow LED (see below), then publishes `smarthome/selftest` (retained JSON: per-check pass or fail with a short cause). A short self-test also runs at boot.
 - The page shows a Health card (signal, memory, uptime, last restart reason) and plain-language issue messages with a suggested fix for each.
 
 ### Settings
@@ -62,6 +63,18 @@ When all is well the yellow LED is Light 3 as today. A status pattern overrides 
 | OK | Light 3 on or off as the person set it |
 
 Setting `status_led` off turns the override off (Light 3 only).
+
+### Self-test pattern (added at the owner's request)
+
+The yellow LED shows a distinct **self-test pattern** (long on, short pause, short on, short pause: 800 ms period) while a self-test runs, both at **board start-up** (a short test right after boot, about 2 s) and when started **remotely** (`cmd/selftest`, about 3 s). The result is then shown by the normal patterns: issues found give the triple blink, none gives Light 3 again. The self-test no longer blinks all three LEDs. The pattern has priority just below setup mode.
+
+### Event log kept on the board (added at the owner's request)
+
+- **What is logged:** one text line per event: boot (reset reason, firmware), Wi-Fi and MQTT lost and regained, issue raised or cleared, settings changed (accepted values), self-test result, setup mode entered and left, OTA start and end. Format: `<epoch seconds, or +uptime before the clock is set> <code> <detail>`, about 60 to 100 bytes a line.
+- **Where:** rotating files in the board's flash (`/log_<n>.txt`, plain text). The newest 3 files are kept; when the current file reaches the size limit (default **64 KB**, a constant) the next file is started and the oldest is deleted. At 64 KB x 3 that is roughly 650 lines per file, weeks of history at normal event rates. Writes are batched (flushed at most every 5 s, immediately for boot and crash events) to limit flash wear.
+- **No compression on the board** (my call, see below). The web page compresses when it downloads.
+- **Pulling it from the website:** the page publishes `smarthome/cmd/log` (`{"list":1}` or `{"get":<n>,"offset":<bytes>}`, not retained). The board answers on `smarthome/log/index` (files and sizes) and streams the requested file as numbered chunks of at most 384 bytes on `smarthome/log/data`, with a short pause between chunks; the page re-requests from the first missing offset if a chunk is lost. Both logins may pull logs. A **Download log** button on the Health view collects the files, shows progress, and saves one `.txt` (gzip-compressed with the browser's built-in compression when available).
+- **Safe by construction:** a log that cannot be written never blocks the sensors, buttons or MQTT; a half-written last line after a power cut is dropped when reading; the log can never fill the flash (the settings file keeps its space); unknown or oversize requests are ignored.
 
 ### Reconnect guide (web)
 
@@ -95,3 +108,6 @@ Exact LED timings, JSON field order, settings storage format (LittleFS file or E
 4. Settings and "restart into setup" are open to both logins; the board validates every value.
 5. A hung board is detected by a missing `health` heartbeat, not by status alone.
 6. Mockups before the UI build.
+7. Log files are plain text, 64 KB each, newest 3 kept, and not compressed on the board. Reasons: the board has about 15 KB of free memory while connected (too little to compress safely), text events are tiny so flash is not the limit, and the phone compresses for free at download. The owner suggested 200 KB x 3 with zip: 3 x 200 KB would fit the 1 MB file system but leaves little room; the constant can be raised.
+8. Logs travel over MQTT in chunks because the board is only reachable through the cloud broker; a direct web server on the board would only work at home.
+9. The self-test no longer blinks all three LEDs; only the yellow LED shows the pattern.
