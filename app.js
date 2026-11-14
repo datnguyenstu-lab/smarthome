@@ -1,5 +1,6 @@
 import { describeBanner, ageText, onOff, describeIssues, guideState, validateSettings, settingsMessage, lastSeenText,
   formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText } from './logic.js';
+import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
 const LIGHTS = { 2: 'Bed light', 3: 'Living room' };  // led 1 (yellow) is the board's status light, not shown
@@ -14,6 +15,7 @@ let client = null, everConnected = false, connected = false, ready = false;
 let view = 'home', guideDismissed = false, celebrating = false;
 let pending = null, dirty = false;                 // settings sent and waiting for the echo / person is editing
 let selfRunning = false, selfBefore = 0, selfTimer = null, selfNote = '';
+let dl = null;  // log download in progress: {files, i, asm, texts, retries, timer}
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 function alertBlock(title, detail, cls) { const d = el('div', 'alertb' + (cls ? ' ' + cls : '')); d.append(el('b', '', title)); if (detail) d.append(detail); return d; }
@@ -87,6 +89,7 @@ function renderHealth() {
   const st = describeSelfTest(state.selftest);
   $('hSelf').textContent = selfRunning ? 'Running…' : st ? st.text : 'not run yet';
   $('runSelf').disabled = !online || selfRunning;
+  $('dlLog').disabled = !online || !!dl;
   $('selfNote').textContent = selfNote || 'The yellow light on the board shows a pattern while the test runs.';
 }
 
@@ -138,6 +141,8 @@ function handle(topic, buf) {
   else if (t === 'state/led2' || t === 'state/led3') { const o = onOff(v); if (o !== null) state.led[t.slice(-1)] = o; }
   else if (t === 'health') state.health = json(buf);
   else if (t === 'settings') state.settings = json(buf);
+  else if (t === 'log/index') onLogIndex(json(buf));
+  else if (t === 'log/data') onLogChunk(parseChunk(buf));
   else if (t === 'selftest') {
     state.selftest = json(buf);
     if (selfRunning && state.selftest && state.selftest.ts > selfBefore) { selfRunning = false; selfNote = 'Done.'; clearTimeout(selfTimer); }
@@ -214,6 +219,65 @@ $('setupBtn').addEventListener('click', () => {
   if (!confirm('Restart the board into setup mode? It goes offline until you join its "SmartHome-Setup" network.')) return;
   publish('smarthome/cmd/setup', '1');
   $('sNote').textContent = 'Restart command sent. Follow the steps on the Home screen when the board goes offline.';
+});
+
+// ---- Download the board's event log: list the files, pull each in chunks, re-request after a stall, save one file ----
+function dlNote(text, cls = '') { $('dlNote').textContent = text; $('dlNote').className = 'note ' + cls; }
+function dlFail(msg) {
+  if (dl) clearTimeout(dl.timer);
+  dl = null; $('dlLog').textContent = 'Try again'; dlNote(msg, 'bad'); render();
+}
+function dlRequest() {
+  const f = dl.files[dl.i];
+  publish('smarthome/cmd/log', requestMessage('get', f.seq, dl.asm.nextOffset()));
+  clearTimeout(dl.timer); dl.timer = setTimeout(dlStall, 3000);
+  dlNote(`Downloading file ${dl.i + 1} of ${dl.files.length}…`);
+}
+function dlStall() { if (!dl) return; if (++dl.retries > 3) dlFail('The download stalled. Try again.'); else dlRequest(); }
+function dlNextFile() {
+  while (dl.i < dl.files.length && !(dl.files[dl.i].bytes > 0)) dl.i++;
+  if (dl.i >= dl.files.length) { dlFinish(); return; }
+  dl.asm = new LogAssembler(dl.files[dl.i].bytes); dl.retries = 0; dlRequest();
+}
+function onLogIndex(idx) {
+  if (!dl || dl.files) return;
+  clearTimeout(dl.timer);
+  dl.files = Array.isArray(idx?.files) ? idx.files : [];
+  if (!dl.files.some((f) => f.bytes > 0)) { dlFail('The board has no log yet.'); return; }
+  dlNextFile();
+}
+function onLogChunk(c) {
+  if (!dl || !dl.asm || !c || c.seq !== dl.files[dl.i].seq) return;
+  if (dl.asm.accept(c)) { dl.retries = 0; clearTimeout(dl.timer); dl.timer = setTimeout(dlStall, 3000); }
+  else if (c.data.length === 0) { dlFail('The board does not have that log file. Try again.'); return; }
+  if (dl.asm.done()) { dl.texts.push(dl.asm.text()); dl.i++; dlNextFile(); }
+}
+async function dlFinish() {
+  clearTimeout(dl.timer);
+  const text = dl.texts.join('');
+  dl = null;
+  let blob = new Blob([text], { type: 'text/plain' }), ext = 'txt';
+  if (typeof CompressionStream !== 'undefined') {
+    try { blob = await new Response(new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))).blob(); ext = 'txt.gz'; } catch { /* plain text is fine */ }
+  }
+  const d = new Date(), p = (n) => String(n).padStart(2, '0');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `smarthome-log-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.${ext}`;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  $('dlLog').textContent = 'Download log';
+  dlNote(`Saved ${text.split('\n').length - 1} log lines.`, 'good');
+  render();
+}
+$('dlLog').addEventListener('click', () => {
+  if (dl) return;
+  dl = { files: null, i: 0, asm: null, texts: [], retries: 0, timer: null };
+  $('dlLog').textContent = 'Download log';
+  dlNote('Asking the board for its log…');
+  publish('smarthome/cmd/log', requestMessage('list'));
+  dl.timer = setTimeout(() => dlFail('The board did not answer. Try again.'), 8000);
+  render();
 });
 
 setInterval(() => { if (!$('app').hidden) render(); }, 30000);
