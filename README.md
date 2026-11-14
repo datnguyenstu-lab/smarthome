@@ -1,14 +1,14 @@
-# Smart Home node (ESP8266)
+# Cold Storage Monitor (ESP8266)
 
-A NodeMCU ESP8266 board with a temperature sensor, a presence (IR) sensor, two lights, two buttons and a status light. It talks to a cloud MQTT broker (EMQX Cloud Serverless) over TLS, so two people can watch it and switch the lights from a phone anywhere, using a static web page on GitHub Pages.
+A NodeMCU ESP8266 board that watches a cold storage room: a temperature sensor, an IR door sensor, two storage lights, two buttons and a status light. It talks to a cloud MQTT broker (EMQX Cloud Serverless) over TLS, so two people can watch the room and switch the lights from a phone anywhere, using a static web page on GitHub Pages.
 
 ## What you get
 
-- **Dashboard:** room temperature on a dial with the heat-alert mark, presence ("Someone there / Nobody there"), two light switches, Away mode.
+- **Dashboard:** storage temperature on a dial with the alert mark, door status (open or closed, and since when), two light switches (**Main storage**, **Secondary storage**) and Lock-up mode.
 - **Live data:** temperature and the board's health refresh every 10 seconds.
-- **Alerts:** too hot (default 35 °C), presence while Away is on, temperature sensor fault.
+- **Alerts:** door open too long (default 10 s), temperature too warm (default 8 °C), door opened while Lock-up mode is on (at once), temperature sensor fault. One alert at a time, in that order of priority.
 - **Health and self-test:** signal, memory, uptime, last restart, problems found, and a self-test you can start from the page.
-- **Settings from the page:** heat threshold, presence hold time, status light on or off. Saved on the board.
+- **Settings from the page:** warm temperature threshold (-25 to 30 °C), how long the door may stay open before the warning (0 to 600 s, 0 = at once), status light on or off. Saved on the board.
 - **Event log on the board** (restarts, Wi-Fi drops, problems, setting changes) that you can download from the page.
 - **Reconnect guide** on the page when the board is offline, and a "Restart into setup mode" button for moving to a new Wi-Fi.
 - **Updates over Wi-Fi (OTA).**
@@ -17,13 +17,13 @@ A NodeMCU ESP8266 board with a temperature sensor, a presence (IR) sensor, two l
 
 | Part | Board pin | Notes |
 |---|---|---|
-| IR obstacle sensor (OUT) | D0 | reads LOW when it detects something |
+| IR obstacle sensor (OUT), used as the door sensor | D0 | point it at the door: it sees the closed door (reads LOW) = **closed**; it sees nothing = **open** |
 | Button 1 | D1 | toggles the middle light; hold 5 s for setup mode |
 | DS18B20 temperature sensor (DATA) | D2 | 3.3 V, GND, and a 4.7 kΩ resistor from DATA to 3.3 V (not needed on a module with one) |
 | Button 2 | D4 | toggles the right light; must not be held LOW while booting |
 | LED 1, yellow (left) | D7 | the status light, not a light you control |
-| LED 2, middle | D6 | "Bed light" on the page |
-| LED 3, right | D5 | "Living room" on the page |
+| LED 2, middle | D6 | "Main storage" on the page |
+| LED 3, right | D5 | "Secondary storage" on the page |
 
 Buttons: one leg to the pin, the diagonal leg to GND (the board's pull-up does the rest). Each LED has a resistor in series to GND. Rename the lights in `LIGHTS` at the top of `web/app.js`.
 
@@ -129,11 +129,11 @@ Lines look like `1794669920 ota start`. A time starting with `+` means the clock
 | Topic | Direction | Notes |
 |---|---|---|
 | `status` | board | `online`, or `offline` (last will), retained |
-| `temp`, `presence`, `presence_changed`, `alert` | board | retained |
+| `temp`, `door` (`open` or `closed`), `door_changed` (epoch seconds), `alert` (`none`, `hot`, `door_open`, `intruder`, `temp_fault`) | board | retained |
 | `state/led2`, `state/led3`, `state/away` | board | retained |
 | `health`, `selftest`, `settings` | board | retained JSON |
 | `cmd/led2`, `cmd/led3` | to board | `on` or `off`, not retained |
-| `cmd/away` | to board | `on` or `off`, retained |
+| `cmd/away` (Lock-up mode) | to board | `on` or `off`, retained |
 | `cmd/settings` | to board | JSON, retained; the board checks and clamps every value |
 | `cmd/selftest`, `cmd/setup` | to board | not retained |
 | `cmd/log` | to board | `{"list":1}` or `{"get":<file>,"offset":<bytes>}` |

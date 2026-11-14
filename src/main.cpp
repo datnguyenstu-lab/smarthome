@@ -19,12 +19,12 @@ using namespace logic;
 
 static Debouncer btn1(30), btn2(30);
 static LongPress btn1Long(5000);
-static PresenceHold presenceHold(5000);
+static Debouncer doorDebounce(300);   // the IR sensor is the door sensor: a change must hold for 300 ms
 static Settings settings;
 static uint32_t connectMs = 0;
-static uint32_t presenceSinceMs = 0;
+static uint32_t doorOpenSinceMs = 0;
 static bool btn1Prev = false, btn2Prev = false;
-static bool presence = false, away = false;
+static bool doorOpen = false, away = false;   // `away` is lock-up mode on the page
 static float lastTemp = NAN;
 static Alert alert = Alert::None;
 static uint32_t lastTempMs = 0;
@@ -33,19 +33,18 @@ static void pub(const char* topic, const char* v) { net::publish(topic, v, true)
 
 static void publishLed(int n) { pub(ledStateTopic(n), leds::get(n) ? "on" : "off"); }
 
-static void applySettings() { presenceHold.setHoldMs(settings.presenceHoldS * 1000UL); }
-
 static void publishSettings() {
   char b[96];
   if (formatSettings(settings, b, sizeof(b))) pub(T_SETTINGS, b);
 }
 
 static bool sameSettings(const Settings& a, const Settings& b) {
-  return a.hotOnC == b.hotOnC && a.presenceHoldS == b.presenceHoldS && a.statusLed == b.statusLed;
+  return a.hotOnC == b.hotOnC && a.doorOpenS == b.doorOpenS && a.statusLed == b.statusLed;
 }
 
 static void publishAlertIfChanged(bool force = false) {
-  Alert a = evalAlert(lastTemp, away, presence, alert, settings.hotOnC);
+  uint32_t openMs = doorOpen ? millis() - doorOpenSinceMs : 0;
+  Alert a = evalAlert(lastTemp, away, doorOpen, openMs, alert, settings.hotOnC, settings.doorOpenS * 1000UL);
   if (a != alert || force) { alert = a; pub(T_ALERT, alertName(a)); }
 }
 
@@ -67,9 +66,9 @@ static void readTemp() {           // collects the conversion started by the loo
   publishAlertIfChanged();
 }
 
-static void publishPresence(bool changed) {
-  pub(T_PRESENCE, presence ? "1" : "0");
-  if (changed) { char b[16]; snprintf(b, sizeof(b), "%ld", (long)time(nullptr)); pub(T_PRESENCE_CHANGED, b); }
+static void publishDoor(bool changed) {
+  pub(T_DOOR, doorOpen ? "open" : "closed");
+  if (changed) { char b[16]; snprintf(b, sizeof(b), "%ld", (long)time(nullptr)); pub(T_DOOR_CHANGED, b); }
 }
 
 // The yellow LED (led 1) is the status LED: dark when all is well, a blink pattern when something needs
@@ -90,7 +89,7 @@ static void onConnected() {  // after every (re)connect: republish everything fr
   healthMonitor::publishNow();
   for (int n = 2; n <= 3; n++) publishLed(n);  // led 1 is the status LED, not a light
   pub(T_STATE_AWAY, away ? "on" : "off");
-  publishPresence(false);
+  publishDoor(false);
   if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
   publishAlertIfChanged(true);
 }
@@ -103,7 +102,6 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
     Settings s = settings;
     if (parseSettings(payload, len, s) && !sameSettings(s, settings)) {
       settings = s;
-      applySettings();
       settingsStore::save(settings);  // only when something changed: the echo never writes flash
       { char d[96]; if (formatSettings(settings, d, sizeof(d))) eventLog::add("settings", d); }
       publishAlertIfChanged();
@@ -127,7 +125,6 @@ void setup() {
   eventLog::begin();
   { char d[64]; snprintf(d, sizeof(d), "reset=%s fw=%s", healthMonitor::resetReason(), FW_VERSION); eventLog::add("boot", d); }
   settings = settingsStore::load();
-  applySettings();
   wifiSetup::onTick([]() { driveStatusLed(true); });
   healthMonitor::onTick([]() { driveStatusLed(false); });
   lastTemp = healthMonitor::selfTestAtBoot();  // yellow LED shows the self-test pattern for about 2 s
@@ -148,9 +145,15 @@ void loop() {
   btn1Prev = b1; btn2Prev = b2;
   if (btn1Long.update(b1, now)) wifiSetup::startPortal();
 
-  bool p = presenceHold.update(sensors::irDetected(), now);
-  if (p != presence) { presence = p; presenceSinceMs = now; publishPresence(true); publishAlertIfChanged(); }
-  healthMonitor::tick(now, tempValid(lastTemp), away, presence ? now - presenceSinceMs : 0);
+  // IR sees the door (closed) -> detected; sees nothing -> the door is open
+  bool open = doorDebounce.update(!sensors::irDetected(), now);
+  if (open != doorOpen) {
+    doorOpen = open; doorOpenSinceMs = now;
+    publishDoor(true);
+    eventLog::add("door", open ? "open" : "closed");
+  }
+  publishAlertIfChanged();   // the grace time runs out without any event, so check every loop (publishes only on change)
+  healthMonitor::tick(now, tempValid(lastTemp), away, doorOpen ? now - doorOpenSinceMs : 0);
   driveStatusLed(false);
   eventLog::tick(now);
 

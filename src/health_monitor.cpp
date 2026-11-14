@@ -80,16 +80,16 @@ static void holdPattern(uint32_t t0, uint32_t ms) {
 }
 
 static void publishSelfTest(bool tempOk) {
-  bool irOk = !(mask & logic::ISSUE_IR_STUCK);
+  bool doorOk = !(mask & logic::ISSUE_DOOR_OPEN_LONG);
   bool wifiOk = net::wifiUp() && WiFi.RSSI() >= logic::RSSI_WEAK_DBM;
   char buf[256];
   snprintf(buf, sizeof(buf),
-           "{\"ts\":%lu,\"checks\":[{\"name\":\"temp\",\"ok\":%s},{\"name\":\"ir\",\"ok\":%s},{\"name\":\"wifi\",\"ok\":%s},{\"name\":\"cloud\",\"ok\":%s}]}",
-           (unsigned long)time(nullptr), tempOk ? "true" : "false", irOk ? "true" : "false", wifiOk ? "true" : "false",
+           "{\"ts\":%lu,\"checks\":[{\"name\":\"temp\",\"ok\":%s},{\"name\":\"door\",\"ok\":%s},{\"name\":\"wifi\",\"ok\":%s},{\"name\":\"cloud\",\"ok\":%s}]}",
+           (unsigned long)time(nullptr), tempOk ? "true" : "false", doorOk ? "true" : "false", wifiOk ? "true" : "false",
            net::connected() ? "true" : "false");
   net::publish(logic::T_SELFTEST, buf, true);
   char d[64];
-  snprintf(d, sizeof(d), "temp=%s ir=%s wifi=%s cloud=%s", tempOk ? "ok" : "FAIL", irOk ? "ok" : "FAIL", wifiOk ? "ok" : "FAIL", net::connected() ? "ok" : "FAIL");
+  snprintf(d, sizeof(d), "temp=%s door=%s wifi=%s cloud=%s", tempOk ? "ok" : "FAIL", doorOk ? "ok" : "FAIL", wifiOk ? "ok" : "FAIL", net::connected() ? "ok" : "FAIL");
   eventLog::add("selftest", d);
 }
 
@@ -116,10 +116,10 @@ void runSelfTest(uint32_t patternMs) {
   running = false;
 }
 
-void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs) {
+void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t doorOpenMs) {
   in.tempOk = tempOk;
   in.away = away;
-  in.presenceHeldMs = presenceHeldMs;
+  in.doorOpenMs = doorOpenMs;
   in.rssi = WiFi.RSSI();
   in.heap = ESP.getFreeHeap();
   in.reconnectsIn10Min = net::reconnectsIn10Min();

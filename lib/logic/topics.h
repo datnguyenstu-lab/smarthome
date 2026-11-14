@@ -3,8 +3,8 @@ namespace logic {
 
 constexpr const char* T_STATUS = "smarthome/status";
 constexpr const char* T_TEMP = "smarthome/temp";
-constexpr const char* T_PRESENCE = "smarthome/presence";
-constexpr const char* T_PRESENCE_CHANGED = "smarthome/presence_changed";
+constexpr const char* T_DOOR = "smarthome/door";                 // "open" or "closed", retained
+constexpr const char* T_DOOR_CHANGED = "smarthome/door_changed";  // epoch seconds, retained
 constexpr const char* T_STATE_AWAY = "smarthome/state/away";
 constexpr const char* T_CMD_AWAY = "smarthome/cmd/away";
 constexpr const char* T_ALERT = "smarthome/alert";

@@ -1,8 +1,9 @@
 // Pure helpers for the page; no DOM, no MQTT, so they can be tested with `node --test`.
 
 const ALERTS = {
-  hot: { level: 'warn', text: 'Room too hot' },
-  intruder: { level: 'error', text: 'Presence while Away is on' },
+  hot: { level: 'warn', text: 'Storage too warm' },
+  intruder: { level: 'error', text: 'Door opened while locked up' },
+  door_open: { level: 'error', text: 'Door open too long' },
   temp_fault: { level: 'warn', text: 'Temperature sensor not responding' },
 };
 
@@ -29,7 +30,7 @@ export function onOff(payload) {
 
 const ISSUES = {
   temp_fault: { level: 'warn', text: 'Temperature sensor not responding', fix: 'Check the sensor wire on D2 and that it has 3.3 V and GND.' },
-  ir_stuck: { level: 'warn', text: 'Presence sensor has been on for 30 minutes', fix: 'Something may be blocking the IR sensor, or it needs re-aiming.' },
+  door_open_long: { level: 'warn', text: 'The door has been open for 30 minutes', fix: 'Close the door, or check the door sensor.' },
   wifi_weak: { level: 'warn', text: 'Wi-Fi signal is weak', fix: 'Move the board or the router closer together.' },
   wifi_unstable: { level: 'warn', text: 'Connection keeps dropping', fix: 'Check the router, and move the board closer to it.' },
   low_memory: { level: 'warn', text: 'Board is low on memory', fix: 'Restart the board. If it comes back, tell the person who maintains it.' },
@@ -64,19 +65,19 @@ function num(v) {
   return NaN;
 }
 
-export function validateSettings({ hot_on_c, presence_hold_s, status_led } = {}) {
+export function validateSettings({ hot_on_c, door_open_s, status_led } = {}) {
   const errors = {};
   const hot = num(hot_on_c);
-  const hold = num(presence_hold_s);
-  if (!Number.isFinite(hot) || hot < 20 || hot > 60) errors.hot_on_c = 'Enter a temperature from 20 to 60 °C.';
-  if (!Number.isInteger(hold) || hold < 1 || hold > 60) errors.presence_hold_s = 'Enter whole seconds from 1 to 60.';
+  const door = num(door_open_s);
+  if (!Number.isFinite(hot) || hot < -25 || hot > 30) errors.hot_on_c = 'Enter a temperature from -25 to 30 °C.';
+  if (!Number.isInteger(door) || door < 0 || door > 600) errors.door_open_s = 'Enter whole seconds from 0 to 600.';
   if (typeof status_led !== 'boolean') errors.status_led = 'Choose on or off.';
   if (Object.keys(errors).length) return { ok: false, errors };
-  return { ok: true, errors, value: { hot_on_c: hot, presence_hold_s: hold, status_led } };
+  return { ok: true, errors, value: { hot_on_c: hot, door_open_s: door, status_led } };
 }
 
-export function settingsMessage({ hot_on_c, presence_hold_s, status_led }) {
-  return JSON.stringify({ hot_on_c, presence_hold_s, status_led });
+export function settingsMessage({ hot_on_c, door_open_s, status_led }) {
+  return JSON.stringify({ hot_on_c, door_open_s, status_led });
 }
 
 export function lastSeenText(nowSec, thenSec) {
@@ -104,7 +105,7 @@ export function signalText(rssi) {
 const RESETS = { power: 'Power on', external: 'Reset button', soft: 'Restarted by software', watchdog: 'Crash recovery', soft_watchdog: 'Crash recovery', exception: 'Crash recovery', deep_sleep: 'Woke from sleep' };
 export function resetText(reason) { return RESETS[reason] ?? 'Unknown'; }
 
-export function dialFraction(tempC, min = 20, max = 60) {
+export function dialFraction(tempC, min = -30, max = 30) {
   const t = Number(tempC);
   if (!Number.isFinite(t)) return 0;
   return Math.min(1, Math.max(0, (t - min) / (max - min)));
@@ -112,10 +113,10 @@ export function dialFraction(tempC, min = 20, max = 60) {
 
 export function sameSettings(a, b) {
   if (!a || !b) return false;
-  return Math.abs(Number(a.hot_on_c) - Number(b.hot_on_c)) < 0.05 && Number(a.presence_hold_s) === Number(b.presence_hold_s) && a.status_led === b.status_led;
+  return Math.abs(Number(a.hot_on_c) - Number(b.hot_on_c)) < 0.05 && Number(a.door_open_s) === Number(b.door_open_s) && a.status_led === b.status_led;
 }
 
-const CHECK_NAMES = { temp: 'temperature sensor', ir: 'presence sensor', wifi: 'Wi-Fi', cloud: 'cloud link' };
+const CHECK_NAMES = { temp: 'temperature sensor', door: 'door sensor', wifi: 'Wi-Fi', cloud: 'cloud link' };
 export function describeSelfTest(result) {
   if (!result || !Array.isArray(result.checks)) return null;
   const failed = result.checks.filter((c) => !c.ok).map((c) => c.name);
@@ -158,4 +159,11 @@ export function describeAbout(obj) {
   const t = (v) => (typeof v === 'string' ? v.trim().slice(0, 60) : '');
   const out = { name: t(obj.name), studentId: t(obj.student_id), className: t(obj.class), year: t(obj.year) };
   return out.name || out.studentId || out.className || out.year ? out : null;
+}
+
+// The IR sensor is the door sensor. `door` is the retained "open" / "closed" message, `changedSec` the epoch
+// seconds of the last change.
+export function describeDoor(door, changedSec, nowSec) {
+  if (door !== 'open' && door !== 'closed') return { state: 'unknown', label: 'Door --', since: '' };
+  return { state: door, label: door === 'open' ? 'Door open' : 'Door closed', since: changedSec ? ageText(nowSec, changedSec) : '' };
 }

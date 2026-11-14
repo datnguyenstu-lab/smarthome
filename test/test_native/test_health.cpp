@@ -5,7 +5,7 @@ using namespace logic;
 
 static HealthInputs good() {
   HealthInputs h;
-  h.tempOk = true; h.away = false; h.presenceHeldMs = 0; h.rssi = -55;
+  h.tempOk = true; h.away = false; h.doorOpenMs = 0; h.rssi = -55;
   h.heap = 30000; h.reconnectsIn10Min = 0; h.crashRecent = false;
   return h;
 }
@@ -15,16 +15,16 @@ static void test_temp_fault_when_temp_not_ok() {
   HealthInputs h = good(); h.tempOk = false;
   TEST_ASSERT_EQUAL_UINT8(ISSUE_TEMP_FAULT, evalIssues(h));
 }
-static void test_ir_stuck_after_30_min_with_away_off() {
-  HealthInputs h = good(); h.presenceHeldMs = 30UL * 60 * 1000;
-  TEST_ASSERT_EQUAL_UINT8(ISSUE_IR_STUCK, evalIssues(h));
+static void test_door_open_long_after_30_min_with_lock_up_off() {
+  HealthInputs h = good(); h.doorOpenMs = 30UL * 60 * 1000;
+  TEST_ASSERT_EQUAL_UINT8(ISSUE_DOOR_OPEN_LONG, evalIssues(h));
 }
-static void test_ir_not_stuck_just_under_30_min() {
-  HealthInputs h = good(); h.presenceHeldMs = 30UL * 60 * 1000 - 1;
+static void test_door_not_long_just_under_30_min() {
+  HealthInputs h = good(); h.doorOpenMs = 30UL * 60 * 1000 - 1;
   TEST_ASSERT_EQUAL_UINT8(0, evalIssues(h));
 }
-static void test_ir_not_stuck_when_away_on() {
-  HealthInputs h = good(); h.presenceHeldMs = 60UL * 60 * 1000; h.away = true;
+static void test_door_long_not_raised_in_lock_up_mode() {
+  HealthInputs h = good(); h.doorOpenMs = 60UL * 60 * 1000; h.away = true;
   TEST_ASSERT_EQUAL_UINT8(0, evalIssues(h));
 }
 static void test_wifi_weak_below_minus_80() {
@@ -61,7 +61,7 @@ static void test_issues_combine_as_bits() {
 }
 static void test_issue_names() {
   TEST_ASSERT_EQUAL_STRING("temp_fault", issueName(ISSUE_TEMP_FAULT));
-  TEST_ASSERT_EQUAL_STRING("ir_stuck", issueName(ISSUE_IR_STUCK));
+  TEST_ASSERT_EQUAL_STRING("door_open_long", issueName(ISSUE_DOOR_OPEN_LONG));
   TEST_ASSERT_EQUAL_STRING("wifi_weak", issueName(ISSUE_WIFI_WEAK));
   TEST_ASSERT_EQUAL_STRING("wifi_unstable", issueName(ISSUE_WIFI_UNSTABLE));
   TEST_ASSERT_EQUAL_STRING("low_memory", issueName(ISSUE_LOW_MEMORY));
@@ -114,9 +114,9 @@ static void test_format_health_returns_zero_when_too_small() {
 void run_health_tests() {
   RUN_TEST(test_no_issues_when_all_good);
   RUN_TEST(test_temp_fault_when_temp_not_ok);
-  RUN_TEST(test_ir_stuck_after_30_min_with_away_off);
-  RUN_TEST(test_ir_not_stuck_just_under_30_min);
-  RUN_TEST(test_ir_not_stuck_when_away_on);
+  RUN_TEST(test_door_open_long_after_30_min_with_lock_up_off);
+  RUN_TEST(test_door_not_long_just_under_30_min);
+  RUN_TEST(test_door_long_not_raised_in_lock_up_mode);
   RUN_TEST(test_wifi_weak_below_minus_80);
   RUN_TEST(test_wifi_not_weak_at_minus_80);
   RUN_TEST(test_wifi_unstable_above_3_reconnects);

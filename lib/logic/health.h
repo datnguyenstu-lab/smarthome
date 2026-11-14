@@ -5,14 +5,14 @@ namespace logic {
 
 enum Issue : uint8_t {
   ISSUE_TEMP_FAULT = 1,
-  ISSUE_IR_STUCK = 2,
+  ISSUE_DOOR_OPEN_LONG = 2,
   ISSUE_WIFI_WEAK = 4,
   ISSUE_WIFI_UNSTABLE = 8,
   ISSUE_LOW_MEMORY = 16,
   ISSUE_CRASH_REBOOT = 32,
 };
 
-constexpr uint32_t IR_STUCK_MS = 30UL * 60 * 1000;
+constexpr uint32_t DOOR_OPEN_LONG_MS = 30UL * 60 * 1000;
 constexpr int RSSI_WEAK_DBM = -80;   // weak when below this
 constexpr int RECONNECTS_MAX = 3;    // unstable when more than this in 10 minutes
 constexpr uint32_t HEAP_MIN_BYTES = 10000;
@@ -20,7 +20,7 @@ constexpr uint32_t HEAP_MIN_BYTES = 10000;
 struct HealthInputs {
   bool tempOk = true;
   bool away = false;
-  uint32_t presenceHeldMs = 0;  // how long the IR has read "present" without a break
+  uint32_t doorOpenMs = 0;       // how long the door has been open without a break
   int rssi = 0;
   uint32_t heap = 0;
   int reconnectsIn10Min = 0;

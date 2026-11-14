@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
+import { describeBanner, ageText, onOff, describeDoor, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -9,8 +9,9 @@ test('unknown status is treated as offline, never as live', () => {
   assert.equal(describeBanner({ alert: 'none', status: undefined }).level, 'error');
 });
 test('each alert has a level and text', () => {
-  assert.deepEqual(describeBanner({ alert: 'hot', status: 'online' }), { level: 'warn', text: 'Room too hot' });
-  assert.deepEqual(describeBanner({ alert: 'intruder', status: 'online' }), { level: 'error', text: 'Presence while Away is on' });
+  assert.deepEqual(describeBanner({ alert: 'hot', status: 'online' }), { level: 'warn', text: 'Storage too warm' });
+  assert.deepEqual(describeBanner({ alert: 'intruder', status: 'online' }), { level: 'error', text: 'Door opened while locked up' });
+  assert.deepEqual(describeBanner({ alert: 'door_open', status: 'online' }), { level: 'error', text: 'Door open too long' });
   assert.deepEqual(describeBanner({ alert: 'temp_fault', status: 'online' }), { level: 'warn', text: 'Temperature sensor not responding' });
   assert.deepEqual(describeBanner({ alert: 'none', status: 'online' }), { level: 'ok', text: '' });
 });
@@ -37,7 +38,7 @@ test('onOff accepts only exact on/off', () => {
   assert.equal(onOff(undefined), null);
 });
 
-const KNOWN = ['temp_fault', 'ir_stuck', 'wifi_weak', 'wifi_unstable', 'low_memory', 'crash_reboot'];
+const KNOWN = ['temp_fault', 'door_open_long', 'wifi_weak', 'wifi_unstable', 'low_memory', 'crash_reboot'];
 test('describeIssues maps each known code with a fix', () => {
   const out = describeIssues(KNOWN);
   assert.equal(out.length, 6);
@@ -71,34 +72,33 @@ test('guideState offline', () => {
   assert.equal(guideState({ status: undefined, healthTs: 990, nowSec: 1000 }), 'offline');
 });
 test('validateSettings accepts defaults', () => {
-  const r = validateSettings({ hot_on_c: 35, presence_hold_s: 5, status_led: true });
+  const r = validateSettings({ hot_on_c: 8, door_open_s: 10, status_led: true });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.value, { hot_on_c: 35, presence_hold_s: 5, status_led: true });
+  assert.deepEqual(r.value, { hot_on_c: 8, door_open_s: 10, status_led: true });
 });
-test('validateSettings rejects hot 10 and 70', () => {
-  assert.equal(validateSettings({ hot_on_c: 10, presence_hold_s: 5, status_led: true }).ok, false);
-  const r = validateSettings({ hot_on_c: 70, presence_hold_s: 5, status_led: true });
-  assert.equal(r.ok, false);
-  assert.ok(r.errors.hot_on_c);
+test('validateSettings warm threshold is -25 to 30', () => {
+  for (const ok of [-25, -18, 0, 8, 30]) assert.equal(validateSettings({ hot_on_c: ok, door_open_s: 10, status_led: true }).ok, true, String(ok));
+  for (const bad of [-26, -30, 31, 40]) assert.equal(validateSettings({ hot_on_c: bad, door_open_s: 10, status_led: true }).ok, false, String(bad));
+  assert.ok(validateSettings({ hot_on_c: 40, door_open_s: 10, status_led: true }).errors.hot_on_c);
 });
-test('validateSettings rejects hold 0 and 61', () => {
-  assert.equal(validateSettings({ hot_on_c: 35, presence_hold_s: 0, status_led: true }).ok, false);
-  assert.equal(validateSettings({ hot_on_c: 35, presence_hold_s: 61, status_led: true }).ok, false);
-  assert.equal(validateSettings({ hot_on_c: 35, presence_hold_s: 5.5, status_led: true }).ok, false);
+test('validateSettings door time is whole seconds 0 to 600', () => {
+  for (const ok of [0, 1, 10, 600]) assert.equal(validateSettings({ hot_on_c: 8, door_open_s: ok, status_led: true }).ok, true, String(ok));
+  for (const bad of [-1, 601, 5.5]) assert.equal(validateSettings({ hot_on_c: 8, door_open_s: bad, status_led: true }).ok, false, String(bad));
+  assert.ok(validateSettings({ hot_on_c: 8, door_open_s: 601, status_led: true }).errors.door_open_s);
 });
 test('validateSettings accepts numeric strings', () => {
-  const r = validateSettings({ hot_on_c: '38.5', presence_hold_s: '12', status_led: false });
+  const r = validateSettings({ hot_on_c: '-18.5', door_open_s: '45', status_led: false });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.value, { hot_on_c: 38.5, presence_hold_s: 12, status_led: false });
+  assert.deepEqual(r.value, { hot_on_c: -18.5, door_open_s: 45, status_led: false });
 });
 test('validateSettings rejects NaN and empty', () => {
-  assert.equal(validateSettings({ hot_on_c: 'abc', presence_hold_s: 5, status_led: true }).ok, false);
-  assert.equal(validateSettings({ hot_on_c: '', presence_hold_s: 5, status_led: true }).ok, false);
-  assert.equal(validateSettings({ hot_on_c: 35, presence_hold_s: 5, status_led: 'yes' }).ok, false);
+  assert.equal(validateSettings({ hot_on_c: 'abc', door_open_s: 5, status_led: true }).ok, false);
+  assert.equal(validateSettings({ hot_on_c: '', door_open_s: 5, status_led: true }).ok, false);
+  assert.equal(validateSettings({ hot_on_c: 8, door_open_s: 5, status_led: 'yes' }).ok, false);
 });
 test('settingsMessage is valid JSON with the three keys', () => {
-  const m = JSON.parse(settingsMessage({ hot_on_c: 36, presence_hold_s: 7, status_led: false }));
-  assert.deepEqual(m, { hot_on_c: 36, presence_hold_s: 7, status_led: false });
+  const m = JSON.parse(settingsMessage({ hot_on_c: 6, door_open_s: 7, status_led: false }));
+  assert.deepEqual(m, { hot_on_c: 6, door_open_s: 7, status_led: false });
 });
 test('lastSeenText', () => {
   assert.equal(lastSeenText(1300, 1000), 'last seen 5 min ago');
@@ -132,26 +132,27 @@ test('resetText names', () => {
   assert.equal(resetText('exception'), 'Crash recovery');
   assert.equal(resetText('whatever'), 'Unknown');
 });
-test('dialFraction clamps to 0..1 over 20..60', () => {
-  assert.equal(dialFraction(20), 0);
-  assert.equal(dialFraction(40), 0.5);
-  assert.equal(dialFraction(60), 1);
-  assert.equal(dialFraction(10), 0);
+test('dialFraction clamps to 0..1 over -30..30 (cold storage)', () => {
+  assert.equal(dialFraction(-30), 0);
+  assert.equal(dialFraction(0), 0.5);
+  assert.equal(dialFraction(30), 1);
+  assert.equal(dialFraction(-40), 0);
   assert.equal(dialFraction(99), 1);
+  assert.ok(Math.abs(dialFraction(8) - 38 / 60) < 1e-9);
   assert.equal(dialFraction(NaN), 0);
   assert.equal(dialFraction(undefined), 0);
 });
 test('sameSettings compares the three values', () => {
-  const a = { hot_on_c: 35, presence_hold_s: 5, status_led: true };
-  assert.equal(sameSettings(a, { ...a, hot_on_c: 35.04 }), true);
-  assert.equal(sameSettings(a, { ...a, hot_on_c: 36 }), false);
-  assert.equal(sameSettings(a, { ...a, presence_hold_s: 6 }), false);
+  const a = { hot_on_c: 8, door_open_s: 10, status_led: true };
+  assert.equal(sameSettings(a, { ...a, hot_on_c: 8.04 }), true);
+  assert.equal(sameSettings(a, { ...a, hot_on_c: 9 }), false);
+  assert.equal(sameSettings(a, { ...a, door_open_s: 11 }), false);
   assert.equal(sameSettings(a, { ...a, status_led: false }), false);
   assert.equal(sameSettings(a, undefined), false);
 });
 test('describeSelfTest', () => {
   assert.deepEqual(describeSelfTest({ checks: [{ name: 'temp', ok: true }, { name: 'wifi', ok: true }] }), { ok: true, failed: [], text: 'All checks passed' });
-  const r = describeSelfTest({ checks: [{ name: 'temp', ok: false }, { name: 'ir', ok: true }, { name: 'cloud', ok: false }] });
+  const r = describeSelfTest({ checks: [{ name: 'temp', ok: false }, { name: 'door', ok: true }, { name: 'cloud', ok: false }] });
   assert.equal(r.ok, false);
   assert.deepEqual(r.failed, ['temp', 'cloud']);
   assert.equal(r.text, 'Needs a look: temperature sensor, cloud link');
@@ -205,4 +206,12 @@ test('describeAbout returns null when there is nothing to show', () => {
 });
 test('describeAbout cuts very long values', () => {
   assert.equal(describeAbout({ name: 'x'.repeat(200) }).name.length, 60);
+});
+
+test('describeDoor open, closed and unknown', () => {
+  assert.deepEqual(describeDoor('open', 700, 1000), { state: 'open', label: 'Door open', since: '5 min ago' });
+  assert.deepEqual(describeDoor('closed', 990, 1000), { state: 'closed', label: 'Door closed', since: 'just now' });
+  assert.deepEqual(describeDoor('closed', undefined, 1000), { state: 'closed', label: 'Door closed', since: '' });
+  assert.deepEqual(describeDoor(undefined, 700, 1000), { state: 'unknown', label: 'Door --', since: '' });
+  assert.deepEqual(describeDoor('banana', 700, 1000), { state: 'unknown', label: 'Door --', since: '' });
 });

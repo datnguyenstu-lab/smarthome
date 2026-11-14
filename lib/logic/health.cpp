@@ -6,7 +6,7 @@ namespace logic {
 uint8_t evalIssues(const HealthInputs& in) {
   uint8_t m = 0;
   if (!in.tempOk) m |= ISSUE_TEMP_FAULT;
-  if (!in.away && in.presenceHeldMs >= IR_STUCK_MS) m |= ISSUE_IR_STUCK;
+  if (!in.away && in.doorOpenMs >= DOOR_OPEN_LONG_MS) m |= ISSUE_DOOR_OPEN_LONG;
   if (in.rssi < RSSI_WEAK_DBM) m |= ISSUE_WIFI_WEAK;
   if (in.reconnectsIn10Min > RECONNECTS_MAX) m |= ISSUE_WIFI_UNSTABLE;
   if (in.heap < HEAP_MIN_BYTES) m |= ISSUE_LOW_MEMORY;
@@ -17,7 +17,7 @@ uint8_t evalIssues(const HealthInputs& in) {
 const char* issueName(uint8_t bit) {
   switch (bit) {
     case ISSUE_TEMP_FAULT: return "temp_fault";
-    case ISSUE_IR_STUCK: return "ir_stuck";
+    case ISSUE_DOOR_OPEN_LONG: return "door_open_long";
     case ISSUE_WIFI_WEAK: return "wifi_weak";
     case ISSUE_WIFI_UNSTABLE: return "wifi_unstable";
     case ISSUE_LOW_MEMORY: return "low_memory";

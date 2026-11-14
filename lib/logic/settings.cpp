@@ -7,11 +7,10 @@
 namespace logic {
 
 Settings clampSettings(Settings s) {
-  if (std::isnan(s.hotOnC)) s.hotOnC = 35.0f;
-  if (s.hotOnC < 20.0f) s.hotOnC = 20.0f;
-  if (s.hotOnC > 60.0f) s.hotOnC = 60.0f;
-  if (s.presenceHoldS < 1) s.presenceHoldS = 1;
-  if (s.presenceHoldS > 60) s.presenceHoldS = 60;
+  if (std::isnan(s.hotOnC)) s.hotOnC = 8.0f;
+  if (s.hotOnC < -25.0f) s.hotOnC = -25.0f;
+  if (s.hotOnC > 30.0f) s.hotOnC = 30.0f;
+  if (s.doorOpenS > 600) s.doorOpenS = 600;
   return s;
 }
 
@@ -64,8 +63,8 @@ bool parseSettings(const char* json, unsigned len, Settings& inOut) {
   bool b;
   if (const char* v = findValue(a, (unsigned)(z - a), "hot_on_c"))
     if (readNumber(v, z, d)) { s.hotOnC = (float)d; any = true; }
-  if (const char* v = findValue(a, (unsigned)(z - a), "presence_hold_s"))
-    if (readNumber(v, z, d)) { s.presenceHoldS = d < 1 ? 1 : d > 60 ? 60 : (uint32_t)d; any = true; }
+  if (const char* v = findValue(a, (unsigned)(z - a), "door_open_s"))
+    if (readNumber(v, z, d)) { s.doorOpenS = d < 0 ? 0 : d > 600 ? 600 : (uint32_t)d; any = true; }
   if (const char* v = findValue(a, (unsigned)(z - a), "status_led"))
     if (readBool(v, z, b)) { s.statusLed = b; any = true; }
   if (!any) return false;
@@ -74,8 +73,8 @@ bool parseSettings(const char* json, unsigned len, Settings& inOut) {
 }
 
 size_t formatSettings(const Settings& s, char* buf, size_t cap) {
-  int n = snprintf(buf, cap, "{\"hot_on_c\":%.1f,\"presence_hold_s\":%u,\"status_led\":%s}", (double)s.hotOnC,
-                   (unsigned)s.presenceHoldS, s.statusLed ? "true" : "false");
+  int n = snprintf(buf, cap, "{\"hot_on_c\":%.1f,\"door_open_s\":%u,\"status_led\":%s}", (double)s.hotOnC,
+                   (unsigned)s.doorOpenS, s.statusLed ? "true" : "false");
   return (n < 0 || (size_t)n >= cap) ? 0 : (size_t)n;
 }
 
