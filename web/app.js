@@ -5,7 +5,7 @@ import { parseChunk, LogAssembler, requestMessage } from './logsync.js';
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
 const APP_VERSION = '2.0.0';  // the page's own release: keep major.minor equal to the board firmware's
 const LIGHTS = { 2: 'Main storage', 3: 'Secondary storage' };  // led 1 (yellow) is the board's status light, not shown
-const DEFAULTS = { hot_on_c: 8, door_open_s: 10, status_led: true };
+const DEFAULTS = { hot_on_c: 33, door_open_s: 10, status_led: true };
 const VIEWS = { home: 'viewHome', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide', about: 'viewAbout' };
 const $ = (id) => document.getElementById(id);
 const nowSec = () => Date.now() / 1000;

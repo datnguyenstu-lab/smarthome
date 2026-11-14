@@ -69,7 +69,7 @@ export function validateSettings({ hot_on_c, door_open_s, status_led } = {}) {
   const errors = {};
   const hot = num(hot_on_c);
   const door = num(door_open_s);
-  if (!Number.isFinite(hot) || hot < -25 || hot > 30) errors.hot_on_c = 'Enter a temperature from -25 to 30 °C.';
+  if (!Number.isFinite(hot) || hot < -25 || hot > 60) errors.hot_on_c = 'Enter a temperature from -25 to 60 °C.';
   if (!Number.isInteger(door) || door < 0 || door > 600) errors.door_open_s = 'Enter whole seconds from 0 to 600.';
   if (typeof status_led !== 'boolean') errors.status_led = 'Choose on or off.';
   if (Object.keys(errors).length) return { ok: false, errors };
@@ -105,7 +105,7 @@ export function signalText(rssi) {
 const RESETS = { power: 'Power on', external: 'Reset button', soft: 'Restarted by software', watchdog: 'Crash recovery', soft_watchdog: 'Crash recovery', exception: 'Crash recovery', deep_sleep: 'Woke from sleep' };
 export function resetText(reason) { return RESETS[reason] ?? 'Unknown'; }
 
-export function dialFraction(tempC, min = -30, max = 30) {
+export function dialFraction(tempC, min = -30, max = 60) {
   const t = Number(tempC);
   if (!Number.isFinite(t)) return 0;
   return Math.min(1, Math.max(0, (t - min) / (max - min)));

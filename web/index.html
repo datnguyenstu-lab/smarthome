@@ -77,7 +77,7 @@
       <div class="top"><button class="linkbtn" data-go="home">‹ Home</button><span>Settings</span></div>
       <h5>Temperature alert</h5>
       <div class="row"><label for="sHot">Warn me above</label>
-        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="-25" max="30" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
+        <span class="stepper"><button data-step="sHot" data-d="-1" aria-label="Lower">−</button><input id="sHot" type="number" inputmode="decimal" min="-25" max="60" step="1"><span>°C</span><button data-step="sHot" data-d="1" aria-label="Raise">+</button></span></div>
       <p class="note bad" id="eHot"></p>
       <h5>Door</h5>
       <div class="row"><label for="sDoor">Warn me when the door stays open for</label>
@@ -88,7 +88,7 @@
       <p class="note" id="sNote"></p>
       <button class="btn" id="sSave">Save settings</button>
       <button class="btn ghost" id="sReset">Reset to defaults</button>
-      <p class="note">Temperature alert: -25 to 30 °C. Door time: 0 to 600 seconds (0 warns at once). In lock-up mode an open door raises the alarm at once. The board checks every value.</p>
+      <p class="note">Temperature alert: -25 to 60 °C. Door time: 0 to 600 seconds (0 warns at once). In lock-up mode an open door raises the alarm at once. The board checks every value.</p>
       <h5>Wi-Fi</h5>
       <button class="btn ghost" id="setupBtn">Restart into setup mode</button>
       <p class="note">Use this when you move the board to a new Wi-Fi. It goes offline until you join its setup network.</p>

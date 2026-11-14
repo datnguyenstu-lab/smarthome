@@ -4,9 +4,9 @@ namespace logic {
 
 enum class Alert { None, Hot, Intruder, TempFault, DoorOpen };
 
-// Cold storage: "hot" means too warm. The warning starts at 8 C by default and clears 1 degree below.
-constexpr float HOT_ON_C = 8.0f;
-constexpr float HOT_OFF_C = 7.0f;
+// Cold storage: "hot" means too warm. The warning starts at 33 C by default and clears 1 degree below.
+constexpr float HOT_ON_C = 33.0f;
+constexpr float HOT_OFF_C = 32.0f;
 constexpr uint32_t DOOR_GRACE_MS = 10000;
 
 // false for -127 (sensor missing), exactly 85.0 (power-on default) and NaN.

@@ -120,10 +120,10 @@ Exact LED timings, JSON field order, settings storage format (LittleFS file or E
 The app now monitors a **cold storage room**. Every name on the page is English.
 
 - **Names:** the page is "Cold Storage Monitor"; the temperature is "Storage temperature"; the lights are **Main storage** (led 2, middle, button D1) and **Secondary storage** (led 3, right, button D4); "Away mode" becomes **Lock-up mode**.
-- **Temperature:** the warning is "too warm" above a threshold that defaults to **8 °C** (range -25 to 30 °C, 1 degree of hysteresis, key `hot_on_c` unchanged). The dial covers -30 to 30 °C.
+- **Temperature:** the warning is "too warm" above a threshold that defaults to **33 °C** (owner's choice; range -25 to 60 °C, 1 degree of hysteresis, key `hot_on_c` unchanged). The dial covers -30 to 60 °C.
 - **The IR sensor becomes a door sensor** (my call, see below): IR sees something (pin LOW) means the door is **closed**; sees nothing means **open**. Changes are debounced for 300 ms. Retained topics `door` (`open` or `closed`) and `door_changed` (epoch seconds) replace `presence` and `presence_changed`.
 - **Door warning:** `alert` becomes `door_open` once the door has been open longer than the **grace time** `door_open_s` (default **10 s**, range 0 to 600; 0 means at once). In Lock-up mode a door that opens raises `intruder` at once.
 - **Priority** of the single `alert`: intruder, then door_open, then temp_fault, then hot. The page also shows the temperature and the door state themselves, so nothing is hidden by a higher alert.
 - **Health issue** `door_open_long` (door open 30 minutes or more, Lock-up mode off) replaces `ir_stuck`. The self-test check `ir` is now `door`.
 - **Settings:** `hot_on_c`, `door_open_s`, `status_led`. `presence_hold_s` is gone. The retained `cmd/settings` already on the broker holds the old keys and must be replaced at rollout.
-- **Calls I made (change any):** closed = IR detects (the sensor faces the door, a closed door reflects the beam); a 10 s grace so someone walking in does not set off the alarm; the warm threshold range and the 8 °C default; Lock-up mode keeps the old intruder behaviour.
+- **Calls I made (change any):** closed = IR detects (the sensor faces the door, a closed door reflects the beam); a 10 s grace so someone walking in does not set off the alarm; the warm threshold range (the default was 8 °C until the owner set 33 °C); Lock-up mode keeps the old intruder behaviour.

@@ -4,7 +4,7 @@
 namespace logic {
 
 struct Settings {
-  float hotOnC = 8.0f;           // warm alert above this, -25..30 (cold storage)
+  float hotOnC = 33.0f;          // warm alert above this, -25..60 (cold storage)
   uint32_t doorOpenS = 10;       // warn when the door stays open this long, 0..600 (0 = at once)
   bool statusLed = true;
 };

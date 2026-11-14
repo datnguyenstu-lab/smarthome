@@ -7,9 +7,9 @@
 namespace logic {
 
 Settings clampSettings(Settings s) {
-  if (std::isnan(s.hotOnC)) s.hotOnC = 8.0f;
+  if (std::isnan(s.hotOnC)) s.hotOnC = 33.0f;
   if (s.hotOnC < -25.0f) s.hotOnC = -25.0f;
-  if (s.hotOnC > 30.0f) s.hotOnC = 30.0f;
+  if (s.hotOnC > 60.0f) s.hotOnC = 60.0f;
   if (s.doorOpenS > 600) s.doorOpenS = 600;
   return s;
 }

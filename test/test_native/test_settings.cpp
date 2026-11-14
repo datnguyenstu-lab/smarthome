@@ -4,15 +4,15 @@
 #include "settings.h"
 using namespace logic;
 
-static void test_defaults_are_8_10_true() {
+static void test_defaults_are_33_10_true() {
   Settings s;
-  TEST_ASSERT_EQUAL_FLOAT(8.0f, s.hotOnC);
+  TEST_ASSERT_EQUAL_FLOAT(33.0f, s.hotOnC);
   TEST_ASSERT_EQUAL_UINT32(10, s.doorOpenS);
   TEST_ASSERT_TRUE(s.statusLed);
 }
 static void test_clamp_warm_low_to_minus_25() { Settings s; s.hotOnC = -50; TEST_ASSERT_EQUAL_FLOAT(-25.0f, clampSettings(s).hotOnC); }
-static void test_clamp_warm_high_to_30() { Settings s; s.hotOnC = 99; TEST_ASSERT_EQUAL_FLOAT(30.0f, clampSettings(s).hotOnC); }
-static void test_clamp_nan_warm_to_default() { Settings s; s.hotOnC = NAN; TEST_ASSERT_EQUAL_FLOAT(8.0f, clampSettings(s).hotOnC); }
+static void test_clamp_warm_high_to_60() { Settings s; s.hotOnC = 99; TEST_ASSERT_EQUAL_FLOAT(60.0f, clampSettings(s).hotOnC); }
+static void test_clamp_nan_warm_to_default() { Settings s; s.hotOnC = NAN; TEST_ASSERT_EQUAL_FLOAT(33.0f, clampSettings(s).hotOnC); }
 static void test_clamp_keeps_negative_freezer_value() { Settings s; s.hotOnC = -15; TEST_ASSERT_EQUAL_FLOAT(-15.0f, clampSettings(s).hotOnC); }
 static void test_clamp_door_high_to_600() { Settings s; s.doorOpenS = 6000; TEST_ASSERT_EQUAL_UINT32(600, clampSettings(s).doorOpenS); }
 static void test_door_zero_is_allowed() { Settings s; s.doorOpenS = 0; TEST_ASSERT_EQUAL_UINT32(0, clampSettings(s).doorOpenS); }
@@ -36,13 +36,13 @@ static void test_parse_missing_keys_keep_current() {
 static void test_parse_wrong_type_ignored() {
   Settings s;
   TEST_ASSERT_TRUE(parse("{\"hot_on_c\":\"warm\",\"door_open_s\":7}", s));
-  TEST_ASSERT_EQUAL_FLOAT(8.0f, s.hotOnC);
+  TEST_ASSERT_EQUAL_FLOAT(33.0f, s.hotOnC);
   TEST_ASSERT_EQUAL_UINT32(7, s.doorOpenS);
 }
 static void test_parse_out_of_range_is_clamped() {
   Settings s;
   TEST_ASSERT_TRUE(parse("{\"hot_on_c\":500,\"door_open_s\":99999}", s));
-  TEST_ASSERT_EQUAL_FLOAT(30.0f, s.hotOnC);
+  TEST_ASSERT_EQUAL_FLOAT(60.0f, s.hotOnC);
   TEST_ASSERT_EQUAL_UINT32(600, s.doorOpenS);
   TEST_ASSERT_TRUE(parse("{\"door_open_s\":-5}", s));
   TEST_ASSERT_EQUAL_UINT32(0, s.doorOpenS);
@@ -90,7 +90,7 @@ static void test_format_default_exact_string() {
   char buf[96];
   Settings s;
   formatSettings(s, buf, sizeof(buf));
-  TEST_ASSERT_EQUAL_STRING("{\"hot_on_c\":8.0,\"door_open_s\":10,\"status_led\":true}", buf);
+  TEST_ASSERT_EQUAL_STRING("{\"hot_on_c\":33.0,\"door_open_s\":10,\"status_led\":true}", buf);
 }
 static void test_format_returns_zero_when_buffer_too_small() {
   char buf[10];
@@ -98,9 +98,9 @@ static void test_format_returns_zero_when_buffer_too_small() {
 }
 
 void run_settings_tests() {
-  RUN_TEST(test_defaults_are_8_10_true);
+  RUN_TEST(test_defaults_are_33_10_true);
   RUN_TEST(test_clamp_warm_low_to_minus_25);
-  RUN_TEST(test_clamp_warm_high_to_30);
+  RUN_TEST(test_clamp_warm_high_to_60);
   RUN_TEST(test_clamp_nan_warm_to_default);
   RUN_TEST(test_clamp_keeps_negative_freezer_value);
   RUN_TEST(test_clamp_door_high_to_600);
