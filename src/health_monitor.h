@@ -5,6 +5,7 @@ namespace healthMonitor {
 // Call every loop with the current facts from main. Publishes smarthome/health every 60 s and on any
 // change of the issue set, and publishes the boot self-test result after the first MQTT connect.
 void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs);
+void publishInfo(const char* buildStamp);  // retained smarthome/info: firmware, build, chip, core, flash
 void publishNow();                       // health JSON, retained (no-op while offline)
 
 // Self-test: the yellow LED shows the self-test pattern for the whole duration (see selfTestRunning()).

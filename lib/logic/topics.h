@@ -12,6 +12,7 @@ constexpr const char* T_CMD_ALL = "smarthome/cmd/#";
 constexpr const char* T_HEALTH = "smarthome/health";
 constexpr const char* T_SELFTEST = "smarthome/selftest";
 constexpr const char* T_SETTINGS = "smarthome/settings";
+constexpr const char* T_INFO = "smarthome/info";
 constexpr const char* T_CMD_SETTINGS = "smarthome/cmd/settings";
 constexpr const char* T_CMD_SELFTEST = "smarthome/cmd/selftest";
 constexpr const char* T_CMD_SETUP = "smarthome/cmd/setup";

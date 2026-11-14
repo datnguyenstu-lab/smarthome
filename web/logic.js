@@ -126,3 +126,27 @@ export function describeSelfTest(result) {
 export function memoryText(bytes) {
   return typeof bytes === 'number' && Number.isFinite(bytes) ? `${Math.round(bytes / 1024)} KB` : '';
 }
+
+function parseVersion(v) {
+  const m = /^(\d+)\.(\d+)\.(\d+)/.exec(typeof v === 'string' ? v : '');
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+// Compares the page's version with the board firmware's. Only major.minor matter (patch and any "-demo"
+// suffix are ignored): a different major.minor may mean the page and the board speak different messages.
+export function describeVersions(pageVersion, boardVersion) {
+  const p = parseVersion(pageVersion), b = parseVersion(boardVersion);
+  if (!p || !b) return { level: 'unknown', text: 'The board has not reported its firmware version yet.' };
+  if (p[0] === b[0] && p[1] === b[1]) return { level: 'ok', text: 'The page and the board are on the same release.' };
+  const boardOlder = b[0] < p[0] || (b[0] === p[0] && b[1] < p[1]);
+  return boardOlder
+    ? { level: 'warn', text: 'The board runs an older release than this page. Update the board firmware.' }
+    : { level: 'warn', text: 'The board runs a newer release than this page. Reload the page to get the latest.' };
+}
+
+// "Nov 14 2026 22:41:05" (the compiler's __DATE__ __TIME__) -> "Nov 14 2026, 22:41"
+export function formatBuild(stamp) {
+  if (typeof stamp !== 'string' || !stamp) return '--';
+  const m = /^(\w{3} +\d{1,2} \d{4}) (\d{2}:\d{2}):\d{2}$/.exec(stamp);
+  return m ? `${m[1]}, ${m[2]}` : stamp;
+}

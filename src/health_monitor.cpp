@@ -39,6 +39,15 @@ static bool crashReset() {
 uint8_t issues() { return mask; }
 const char* resetReason() { return resetName(); }
 
+void publishInfo(const char* buildStamp) {
+  char buf[256];
+  snprintf(buf, sizeof(buf),
+           "{\"fw\":\"%s\",\"build\":\"%s\",\"chip\":\"esp8266-%06x\",\"core\":\"%s\",\"flash_kb\":%lu,\"sketch_kb\":%lu}",
+           FW, buildStamp, (unsigned)ESP.getChipId(), ESP.getCoreVersion().c_str(),
+           (unsigned long)(ESP.getFlashChipRealSize() / 1024), (unsigned long)(ESP.getSketchSize() / 1024));
+  net::publish(logic::T_INFO, buf, true);
+}
+
 void publishNow() {
   logic::HealthReport r;
   r.ts = (uint32_t)time(nullptr);

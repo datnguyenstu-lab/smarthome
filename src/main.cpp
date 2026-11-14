@@ -83,6 +83,7 @@ static void driveStatusLed(bool setupMode) {
 static void onConnected() {  // after every (re)connect: republish everything from RAM
   connectMs = millis();
   publishSettings();
+  healthMonitor::publishInfo(__DATE__ " " __TIME__);
   healthMonitor::publishNow();
   for (int n = 2; n <= 3; n++) publishLed(n);  // led 1 is the status LED, not a light
   pub(T_STATE_AWAY, away ? "on" : "off");

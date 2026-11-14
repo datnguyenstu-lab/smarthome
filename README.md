@@ -60,7 +60,7 @@ powershell -File tools\demo_ota.ps1 -Version 2.1.0-demo   # about 45 s, then the
 powershell -File tools\demo_ota.ps1 -Version 2.0.0        # back to the first image
 ```
 
-The Health page, the `health` message (`fw`) and the event log (`boot ... fw=<version>`, plus `ota start` and `ota end`) all show the change. Over-the-air updates work only from the computer on the same network; there is no update from the web page (see the design notes for why).
+The About screen (Home, bottom row) shows the page and board versions, the firmware build time, chip, core and flash size, and warns when the board runs a different release than the page, which is what you will see during the demo (page 2.0.0, board 2.1.0-demo). The Health page, the `health` message (`fw`) and the event log (`boot ... fw=<version>`, plus `ota start` and `ota end`) all show the change. Over-the-air updates work only from the computer on the same network; there is no update from the web page (see the design notes for why).
 
 ## Wi-Fi setup mode
 
