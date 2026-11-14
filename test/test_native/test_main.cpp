@@ -2,6 +2,8 @@
 #include "logic.h"
 
 void run_alerts_tests();
+void run_timing_tests();
+void run_topics_tests();
 
 void setUp() {}
 void tearDown() {}
@@ -12,5 +14,7 @@ int main() {
   UNITY_BEGIN();
   RUN_TEST(test_harness_runs);
   run_alerts_tests();
+  run_timing_tests();
+  run_topics_tests();
   return UNITY_END();
 }
