@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace net {
 using MessageCb = void (*)(const char* topic, const char* payload, unsigned len);
@@ -11,6 +12,7 @@ int wifiReconnects();                      // Wi-Fi links regained since boot
 int mqttReconnects();                      // MQTT connects after the first since boot
 int reconnectsIn10Min();                   // both kinds, last 10 minutes (newest 8 kept)
 bool publish(const char* topic, const char* payload, bool retained);
+bool publishBytes(const char* topic, const uint8_t* data, unsigned len);   // not retained; for log chunks
 void onMessage(MessageCb cb);              // every message on smarthome/cmd/#
 void onConnect(void (*cb)());              // called after each (re)connect
 }  // namespace net

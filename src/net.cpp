@@ -10,6 +10,7 @@
 #include "wifi_setup.h"
 #include "topics.h"
 #include "health.h"
+#include "event_log.h"
 
 namespace net {
 
@@ -21,7 +22,7 @@ static void (*connectCb)() = nullptr;
 static uint32_t lastTry = 0;
 static logic::EventWindow reconnects(600000);
 static int wifiRc = 0, mqttRc = 0;
-static bool wifiWasUp = true, everMqtt = false;
+static bool wifiWasUp = true, everMqtt = false, mqttWasUp = false, failLogged = false;
 
 static void relay(char* topic, byte* payload, unsigned len) {
   if (!msgCb) return;
@@ -38,9 +39,13 @@ static bool tryConnect() {
     char err[96];
     tls.getLastSSLError(err, sizeof(err));
     Serial.printf("MQTT failed rc=%d ssl=%s\n", mqtt.state(), err);
+    if (!failLogged) { failLogged = true; char d[48]; snprintf(d, sizeof(d), "connect failed rc=%d", mqtt.state()); eventLog::add("mqtt", d); }
     return false;
   }
   Serial.println("MQTT connected");
+  eventLog::add("mqtt", "up");
+  failLogged = false;
+  mqttWasUp = true;
   if (everMqtt) { mqttRc++; reconnects.add(millis()); }
   everMqtt = true;
   mqtt.publish(logic::T_STATUS, "online", true);
@@ -52,6 +57,7 @@ static bool tryConnect() {
 void begin() {
   if (!wifiSetup::connect()) { Serial.println("Wi-Fi setup failed, restarting"); delay(500); ESP.restart(); }
   Serial.printf("Wi-Fi OK, IP %s\n", WiFi.localIP().toString().c_str());
+  { char d[48]; snprintf(d, sizeof(d), "up rssi=%d", WiFi.RSSI()); eventLog::add("wifi", d); }
 
   configTime(0, 0, "time.google.com", "pool.ntp.org");  // TLS certificate check needs the real time
   uint32_t t0 = millis();
@@ -66,14 +72,21 @@ void begin() {
 
   ArduinoOTA.setHostname("smarthome-node");
   ArduinoOTA.setPassword(OTA_PASS);
+  ArduinoOTA.onStart([]() { eventLog::add("ota", "start"); });
+  ArduinoOTA.onEnd([]() { eventLog::add("ota", "end"); eventLog::flush(); });
+  ArduinoOTA.onError([](ota_error_t e) { char d[24]; snprintf(d, sizeof(d), "error %d", (int)e); eventLog::add("ota", d); });
   ArduinoOTA.begin();
 }
 
 void loop() {
   ArduinoOTA.handle();
   bool up = WiFi.status() == WL_CONNECTED;
-  if (up && !wifiWasUp) { wifiRc++; reconnects.add(millis()); }
+  if (up && !wifiWasUp) { wifiRc++; reconnects.add(millis()); eventLog::add("wifi", "up"); }
+  if (!up && wifiWasUp) eventLog::add("wifi", "lost");
   wifiWasUp = up;
+  bool mq = mqtt.connected();
+  if (!mq && mqttWasUp) eventLog::add("mqtt", "lost");
+  mqttWasUp = mq;
   if (mqtt.connected()) { mqtt.loop(); return; }
   if (millis() - lastTry >= 5000 || lastTry == 0) { lastTry = millis(); if (WiFi.status() == WL_CONNECTED) tryConnect(); }
 }
@@ -83,6 +96,7 @@ bool wifiUp() { return WiFi.status() == WL_CONNECTED; }
 int wifiReconnects() { return wifiRc; }
 int mqttReconnects() { return mqttRc; }
 int reconnectsIn10Min() { return reconnects.count(millis()); }
+bool publishBytes(const char* topic, const uint8_t* data, unsigned len) { return mqtt.connected() && mqtt.publish(topic, data, len, false); }
 bool publish(const char* topic, const char* payload, bool retained) { return mqtt.connected() && mqtt.publish(topic, payload, retained); }
 void onMessage(MessageCb cb) { msgCb = cb; }
 void onConnect(void (*cb)()) { connectCb = cb; }

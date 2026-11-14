@@ -12,6 +12,7 @@
 #include "settings_store.h"
 #include "health_monitor.h"
 #include "statusled.h"
+#include "event_log.h"
 
 using namespace logic;
 
@@ -99,6 +100,7 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
       settings = s;
       applySettings();
       settingsStore::save(settings);  // only when something changed: the echo never writes flash
+      { char d[96]; if (formatSettings(settings, d, sizeof(d))) eventLog::add("settings", d); }
       publishAlertIfChanged();
     }
     publishSettings();  // the echo shows what the board really holds
@@ -106,6 +108,7 @@ static void onCommand(const char* topic, const char* payload, unsigned len) {
   }
   // A retained cmd/setup or cmd/selftest arrives right after connecting; ignore that so it cannot boot-loop the board.
   if (strcmp(topic, T_CMD_SETUP) == 0) { if (millis() - connectMs > 3000) wifiSetup::startPortal(); return; }
+  if (strcmp(topic, T_CMD_LOG) == 0) { if (millis() - connectMs > 3000) eventLog::handleCommand(payload, len); return; }
   if (strcmp(topic, T_CMD_SELFTEST) == 0) { if (millis() - connectMs > 3000) healthMonitor::runSelfTest(3000); return; }
   if (strcmp(topic, T_CMD_AWAY) == 0 && parseOnOff(payload, len, on)) setAway(on);
 }
@@ -116,6 +119,8 @@ void setup() {
   pinMode(PIN_BTN2, INPUT_PULLUP);
   leds::begin();
   sensors::begin();
+  eventLog::begin();
+  { char d[64]; snprintf(d, sizeof(d), "reset=%s fw=2.0.0", healthMonitor::resetReason()); eventLog::add("boot", d); }
   settings = settingsStore::load();
   applySettings();
   wifiSetup::onTick([]() { driveStatusLed(true); });
@@ -142,6 +147,7 @@ void loop() {
   if (p != presence) { presence = p; presenceSinceMs = now; publishPresence(true); publishAlertIfChanged(); }
   healthMonitor::tick(now, tempValid(lastTemp), away, presence ? now - presenceSinceMs : 0);
   driveStatusLed(false);
+  eventLog::tick(now);
 
   if (now - lastTempMs >= 30000) { lastTempMs = now; readTemp(); }
 }

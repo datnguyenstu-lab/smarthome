@@ -14,5 +14,6 @@ bool selfTestRunning();
 float selfTestAtBoot();                  // call early in setup(): about 2 s; returns the temperature read
 void runSelfTest(uint32_t patternMs);    // from cmd/selftest: result published at once, pattern held patternMs
 
-uint8_t issues();                        // current logic::Issue bitmask
+const char* resetReason();               // power, external, soft, watchdog, exception, ...
+uint8_t issues();                      // current logic::Issue bitmask
 }  // namespace healthMonitor

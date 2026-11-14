@@ -8,6 +8,7 @@
 #include "leds.h"
 #include "sensors.h"
 #include "alerts.h"
+#include "event_log.h"
 
 namespace healthMonitor {
 
@@ -35,6 +36,7 @@ static bool crashReset() {
 }
 
 uint8_t issues() { return mask; }
+const char* resetReason() { return resetName(); }
 
 void publishNow() {
   logic::HealthReport r;
@@ -75,6 +77,9 @@ static void publishSelfTest(bool tempOk) {
            (unsigned long)time(nullptr), tempOk ? "true" : "false", irOk ? "true" : "false", wifiOk ? "true" : "false",
            net::connected() ? "true" : "false");
   net::publish(logic::T_SELFTEST, buf, true);
+  char d[64];
+  snprintf(d, sizeof(d), "temp=%s ir=%s wifi=%s cloud=%s", tempOk ? "ok" : "FAIL", irOk ? "ok" : "FAIL", wifiOk ? "ok" : "FAIL", net::connected() ? "ok" : "FAIL");
+  eventLog::add("selftest", d);
 }
 
 float selfTestAtBoot() {
@@ -110,6 +115,13 @@ void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs) {
   in.crashRecent = crashReset() && nowMs < 3600UL * 1000;  // cleared after one clean hour
   uint8_t m = logic::evalIssues(in);
   bool changed = m != mask;
+  if (changed) {
+    for (uint8_t bit = 1; bit != 0 && bit <= logic::ISSUE_CRASH_REBOOT; bit <<= 1) {
+      char d[40];
+      if ((m & bit) && !(mask & bit)) { snprintf(d, sizeof(d), "raised %s", logic::issueName(bit)); eventLog::add("issue", d); }
+      if (!(m & bit) && (mask & bit)) { snprintf(d, sizeof(d), "cleared %s", logic::issueName(bit)); eventLog::add("issue", d); }
+    }
+  }
   mask = m;
   if (net::connected() && (changed || lastPubMs == 0 || nowMs - lastPubMs >= 60000)) publishNow();
   if (bootPending && net::connected()) { bootPending = false; publishSelfTest(bootTempOk); }

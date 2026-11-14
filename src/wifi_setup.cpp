@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include "secrets.h"
+#include "event_log.h"
 
 namespace wifiSetup {
 
@@ -45,8 +46,11 @@ void startPortal() {
   WiFiManager wm;
   wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
   wm.setConfigPortalBlocking(false);
+  eventLog::add("setup", "start");
   wm.startConfigPortal(AP_NAME, SETUP_AP_PASS);
-  waitForPortal(wm);
+  bool joined = waitForPortal(wm);
+  eventLog::add("setup", joined ? "end" : "end timeout");
+  eventLog::flush();
   ESP.restart();  // back to normal, whether saved or timed out
 }
 
