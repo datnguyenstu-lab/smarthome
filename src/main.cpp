@@ -67,13 +67,13 @@ static void publishPresence(bool changed) {
   if (changed) { char b[16]; snprintf(b, sizeof(b), "%ld", (long)time(nullptr)); pub(T_PRESENCE_CHANGED, b); }
 }
 
-// The yellow LED is Light 3 until something needs attention; then a blink pattern overrides it, and
-// when the pattern ends Light 3 goes back to the state the person set.
+// The yellow LED (led 1) is the status LED: dark when all is well, a blink pattern when something needs
+// attention. It is not a light the person controls.
 static void driveStatusLed(bool setupMode) {
   static Pattern prev = Pattern::None;
   Pattern p = pickPattern(setupMode, net::wifiUp(), net::connected(), healthMonitor::issues(), settings.statusLed);
-  if (p != Pattern::None) leds::drive(3, patternLevel(p, millis()));
-  else if (prev != Pattern::None) leds::drive(3, leds::get(3));
+  if (p != Pattern::None) leds::drive(1, patternLevel(p, millis()));
+  else if (prev != Pattern::None) leds::drive(1, false);
   prev = p;
 }
 
@@ -81,7 +81,7 @@ static void onConnected() {  // after every (re)connect: republish everything fr
   connectMs = millis();
   publishSettings();
   healthMonitor::publishNow();
-  for (int n = 1; n <= 3; n++) publishLed(n);
+  for (int n = 2; n <= 3; n++) publishLed(n);  // led 1 is the status LED, not a light
   pub(T_STATE_AWAY, away ? "on" : "off");
   publishPresence(false);
   if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
@@ -91,7 +91,7 @@ static void onConnected() {  // after every (re)connect: republish everything fr
 static void onCommand(const char* topic, const char* payload, unsigned len) {
   bool on;
   int n = ledFromCmdTopic(topic);
-  if (n) { if (parseOnOff(payload, len, on)) setLed(n, on); return; }
+  if (n) { if (n != 1 && parseOnOff(payload, len, on)) setLed(n, on); return; }  // led 1 = status LED: ignored
   if (strcmp(topic, T_CMD_SETTINGS) == 0) {
     Settings s = settings;
     if (parseSettings(payload, len, s) && !sameSettings(s, settings)) {

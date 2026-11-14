@@ -50,9 +50,9 @@ Phase 1 works but is a demo: when something goes wrong you need a serial cable, 
 - "Reset to defaults" button.
 - The MQTT receive buffer must grow (it is 64 bytes today) to fit the settings JSON; oversize payloads are still dropped.
 
-### Status light (yellow LED, Light 3)
+### Status light (yellow LED = led 1)
 
-When all is well the yellow LED is Light 3 as today. A status pattern overrides it while something needs attention, highest priority first (my call, timings tunable):
+The yellow LED (leftmost, led 1, pin D7) is **the status LED only**: the owner decided it is not a light to control. It is dark when all is well and shows a pattern while something needs attention, highest priority first (timings tunable). The lights are led 2 (middle, button D1) and led 3 (right, button D4); `cmd/led1` is ignored and `state/led1` is no longer published.
 
 | State | Pattern |
 |---|---|
@@ -60,9 +60,9 @@ When all is well the yellow LED is Light 3 as today. A status pattern overrides 
 | No Wi-Fi | double blink every 2 s |
 | Cloud not reachable | slow blink |
 | Sensor or health issue | triple blink every 3 s |
-| OK | Light 3 on or off as the person set it |
+| OK | dark |
 
-Setting `status_led` off turns the override off (Light 3 only).
+Setting `status_led` off keeps the yellow LED dark except for setup mode and self-test.
 
 ### Self-test pattern (added at the owner's request)
 
@@ -102,7 +102,7 @@ Exact LED timings, JSON field order, settings storage format (LittleFS file or E
 
 ## Calls I made (change any of these)
 
-1. The yellow LED doubles as the status light and keeps being Light 3 when all is well.
+1. The yellow LED is the status LED only (owner decision after the first hardware test); lights are middle and right.
 2. The six issue rules and their thresholds above.
 3. Three settings only (hot threshold, presence hold, status LED switch).
 4. Settings and "restart into setup" are open to both logins; the board validates every value.

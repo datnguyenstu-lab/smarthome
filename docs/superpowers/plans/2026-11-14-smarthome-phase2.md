@@ -18,7 +18,7 @@
 - Self-test pattern on the yellow LED: 800 ms period, on 0-500, off 500-600, on 600-700, off 700-800; shown for about 2 s at boot and about 3 s on `cmd/selftest`; shows even when `status_led` is off.
 
 - Existing topics and behaviour do not change: `temp`, `presence`, `presence_changed`, `alert`, `status`, `state/led1..3`, `state/away`, `cmd/led1..3`, `cmd/away`.
-- Pins (do not change): IR D0, BTN1 D1 (toggles Light 2), DS18B20 D2, BTN2 D4 (toggles Light 3), LEDs `{D7, D6, D5}` = Light 1 right, Light 2 middle, Light 3 yellow.
+- Pins (do not change): IR D0, BTN1 D1 (toggles Light 2), DS18B20 D2, BTN2 D4 (toggles Light 3), LEDs `{D7, D6, D5}` = led1 yellow (status LED only, not controllable), led2 middle (button D1), led3 right (button D4).
 - MQTT keep-alive 30 s; TLS to `hff38f13.ala.asia-southeast1.emqxsl.com:8883`; OTA hostname `smarthome-node` stays working.
 - Settings defaults and clamps: `hot_on_c` 35 (20..60), `presence_hold_s` 5 (1..60), `status_led` true. Hot hysteresis is 1.0 degree (off = on - 1).
 - Issue thresholds: IR stuck 30 min with Away off; RSSI below -80 dBm; more than 3 reconnects in 10 min; free heap below 10000 bytes.
@@ -30,7 +30,7 @@
 
 1. Garbled, oversize, wrong-type, missing-field or out-of-range settings JSON must never crash, brick or persist junk: expected, the board clamps or ignores and echoes what it really holds.
 2. A retained `cmd/settings` is applied once per delivery and saved to flash only when a value actually changed (flash wear, no write loop from the echo).
-3. When a status pattern ends, Light 3 returns to the on/off state the person set, not whatever the pattern left.
+3. When a status pattern ends the yellow status LED goes dark, and commands for led 1 are ignored.
 4. A retained `health` message from hours ago must not make the page think the board is alive: staleness uses the message's own `ts`.
 5. Counters and windows survive the `millis()` wrap (about 49 days) without false issues.
 6. The event log can never fill the flash (settings keep their space), a half-written last line after a power cut is not served, a failed log write never stalls sensors, buttons or MQTT, and flapping Wi-Fi cannot write the flash on every event (batched flushes).
@@ -285,5 +285,5 @@
 - [ ] **Step 3: Implement** the enum value, `pickPattern` parameter and `patternLevel` case (`nowMs % 800`). Run `pio test -e native`. Expected: all PASS.
 - [ ] **Step 4: Firmware.** Remove the three-LED blink and the `leds` check from the self-test JSON (checks become `temp`, `ir`, `wifi`, `cloud`). `selfTestAtBoot()` is called in `setup()` before `net::begin()`: it reads the temperature, runs the pattern for about 2 s through `onTick`, and stores the result for publishing after the first connect. `cmd/selftest` runs `runSelfTest(3000)` (still ignored within 3 s after an MQTT connect). `driveStatusLed` passes `healthMonitor::selfTestRunning()` to `pickPattern`.
 - [ ] **Step 5: Compile** `pio run -e nodemcuv2`. Expected: SUCCESS.
-- [ ] **Step 6: Flash and verify with the owner at the board:** after power-up the yellow LED shows the long-short pattern for about 2 s, then Light 3's state or the normal status pattern; `tools/watch.py 8 'smarthome/cmd/selftest=1'` shows the same pattern for about 3 s and a `selftest` result with four checks; with `status_led` set to false the self-test pattern still shows; Light 3 returns to its set state afterwards.
+- [ ] **Step 6: Flash and verify with the owner at the board:** after power-up the yellow LED shows the long-short pattern for about 2 s, then Light 3's state or the normal status pattern; `tools/watch.py 8 'smarthome/cmd/selftest=1'` shows the same pattern for about 3 s and a `selftest` result with four checks; with `status_led` set to false the self-test pattern still shows; the yellow LED is dark afterwards.
 - [ ] **Step 7: Commit** `feat: self-test pattern on the yellow LED at boot and on command`.

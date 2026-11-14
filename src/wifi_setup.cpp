@@ -12,16 +12,17 @@ static void (*tickCb)() = nullptr;
 
 void onTick(void (*cb)()) { tickCb = cb; }
 
-// Keeps the non-blocking portal alive; true when the board joined a network, false on timeout.
+// Keeps the non-blocking portal alive until it finishes (network saved and joined, or its timeout);
+// true when the board ends up connected. Must not test WiFi.status() inside the loop: a board that is
+// already online (setup started from a command) would leave at once.
 static bool waitForPortal(WiFiManager& wm) {
   uint32_t t0 = millis();
   while (millis() - t0 < PORTAL_TIMEOUT_S * 1000UL) {
-    wm.process();
-    if (WiFi.status() == WL_CONNECTED) return true;
+    if (wm.process()) break;
     if (tickCb) tickCb();
     delay(5);
   }
-  return false;
+  return WiFi.status() == WL_CONNECTED;
 }
 
 bool connect() {
