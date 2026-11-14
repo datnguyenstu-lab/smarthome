@@ -81,6 +81,7 @@ function renderHealth() {
   $('hMem').textContent = memoryText(h.heap) || '--';
   $('hUp').textContent = formatUptime(h.uptime_s) || '--';
   $('hReset').textContent = h.reset ? resetText(h.reset) : '--';
+  $('hFw').textContent = h.fw || '--';
   const box = $('hIssues');
   box.replaceChildren();
   const issues = describeIssues(h.issues);

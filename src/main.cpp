@@ -13,6 +13,7 @@
 #include "health_monitor.h"
 #include "statusled.h"
 #include "event_log.h"
+#include "version.h"
 
 using namespace logic;
 
@@ -120,7 +121,7 @@ void setup() {
   leds::begin();
   sensors::begin();
   eventLog::begin();
-  { char d[64]; snprintf(d, sizeof(d), "reset=%s fw=2.0.0", healthMonitor::resetReason()); eventLog::add("boot", d); }
+  { char d[64]; snprintf(d, sizeof(d), "reset=%s fw=%s", healthMonitor::resetReason(), FW_VERSION); eventLog::add("boot", d); }
   settings = settingsStore::load();
   applySettings();
   wifiSetup::onTick([]() { driveStatusLed(true); });

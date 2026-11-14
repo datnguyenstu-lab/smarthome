@@ -45,6 +45,23 @@ PLATFORMIO_UPLOAD_FLAGS="--auth=<OTA_PASS>" pio run -e ota -t upload
 
 A wrong password is refused. The log records `ota start` and `ota end`. Only the firmware can be updated this way; changing the flash layout needs USB.
 
+## Demo: show a version change over Wi-Fi
+
+Prepare the images once (about 2 minutes; they hold your `secrets.h`, so `demo/` is git-ignored):
+
+```
+powershell -File toolsuild_demo.ps1                 # builds demoirmware-2.0.0.bin and demoirmware-2.1.0-demo.bin
+```
+
+On the day, with the computer on the board's network and the page open on Health (the **Firmware** row):
+
+```
+powershell -File tools\demo_ota.ps1 -Version 2.1.0-demo   # about 45 s, then the page shows 2.1.0-demo
+powershell -File tools\demo_ota.ps1 -Version 2.0.0        # back to the first image
+```
+
+The Health page, the `health` message (`fw`) and the event log (`boot ... fw=<version>`, plus `ota start` and `ota end`) all show the change. Over-the-air updates work only from the computer on the same network; there is no update from the web page (see the design notes for why).
+
 ## Wi-Fi setup mode
 
 - **From the board:** hold button 1 (D1) for 5 seconds. The yellow light fast-blinks.

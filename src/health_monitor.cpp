@@ -9,10 +9,11 @@
 #include "sensors.h"
 #include "alerts.h"
 #include "event_log.h"
+#include "version.h"
 
 namespace healthMonitor {
 
-static const char* FW = "2.0.0";
+static const char* FW = FW_VERSION;
 static uint8_t mask = 0;
 static uint32_t lastPubMs = 0;
 static logic::HealthInputs in;
