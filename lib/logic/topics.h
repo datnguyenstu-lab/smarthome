@@ -8,6 +8,7 @@ constexpr const char* T_DOOR_CHANGED = "smarthome/door_changed";  // epoch secon
 constexpr const char* T_STATE_AWAY = "smarthome/state/away";
 constexpr const char* T_CMD_AWAY = "smarthome/cmd/away";
 constexpr const char* T_ALERT = "smarthome/alert";
+constexpr const char* T_ALERT_EVENT = "smarthome/event/alert";   // one non-retained message per real change, with a ready-made text
 constexpr const char* T_CMD_ALL = "smarthome/cmd/#";
 constexpr const char* T_HEALTH = "smarthome/health";
 constexpr const char* T_SELFTEST = "smarthome/selftest";

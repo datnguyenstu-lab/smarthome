@@ -8,6 +8,7 @@ void run_settings_tests();
 void run_health_tests();
 void run_statusled_tests();
 void run_logfmt_tests();
+void run_alertmsg_tests();
 
 void setUp() {}
 void tearDown() {}
@@ -24,5 +25,6 @@ int main() {
   run_health_tests();
   run_statusled_tests();
   run_logfmt_tests();
+  run_alertmsg_tests();
   return UNITY_END();
 }

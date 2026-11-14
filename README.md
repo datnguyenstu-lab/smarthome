@@ -5,6 +5,7 @@ A NodeMCU ESP8266 board that watches a cold storage room: a temperature sensor, 
 ## What you get
 
 - **Dashboard:** storage temperature on a dial with the alert mark, door status (open or closed, and since when), two light switches (**Main storage**, **Secondary storage**) and Lock-up mode.
+- **Telegram alerts:** each real alert change is sent to a Telegram group as a bilingual sentence (setup in `docs/telegram-alerts.md`; the bot token stays in EMQX).
 - **English and Vietnamese:** an EN | VI switch on the login screen and in Settings. The page starts in the browser's language and remembers your choice. Texts live in `web/i18n.js` (the English text is the key); a test fails if any text on the page has no Vietnamese translation.
 - **Live data:** temperature and the board's health refresh every 10 seconds.
 - **Alerts:** door open too long (default 10 s), temperature too warm (default 33 °C), door opened while Lock-up mode is on (at once), temperature sensor fault. One alert at a time, in that order of priority.
@@ -139,6 +140,7 @@ The time is ISO 8601 UTC; `T+hh:mm:ss` means the clock was not set yet (time sin
 |---|---|---|
 | `status` | board | `online`, or `offline` (last will), retained |
 | `temp`, `door` (`open` or `closed`), `door_changed` (epoch seconds), `alert` (`none`, `hot`, `door_open`, `intruder`, `temp_fault`) | board | retained |
+| `event/alert` | board | JSON `{alert, text}` once per real alert change, not retained |
 | `state/led2`, `state/led3`, `state/away` | board | retained |
 | `health`, `selftest`, `settings` | board | retained JSON |
 | `cmd/led2`, `cmd/led3` | to board | `on` or `off`, not retained |

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <time.h>
 #include "alerts.h"
+#include "alertmsg.h"
 #include "timing.h"
 #include "topics.h"
 #include "pins.h"
@@ -46,7 +47,16 @@ static bool sameSettings(const Settings& a, const Settings& b) {
 static void publishAlertIfChanged(bool force = false) {
   uint32_t openMs = doorOpen ? millis() - doorOpenSinceMs : 0;
   Alert a = evalAlert(lastTemp, away, doorOpen, openMs, alert, settings.hotOnC, settings.doorOpenS * 1000UL);
-  if (a != alert || force) { alert = a; pub(T_ALERT, alertName(a)); }
+  if (a != alert || force) {
+    bool changed = a != alert;
+    alert = a;
+    pub(T_ALERT, alertName(a));
+    if (changed) {   // a real change (not a reconnect): log it and tell the broker, which can forward it (Telegram)
+      if (a == Alert::None) eventLog::info("alert", "cleared"); else eventLog::warn("alert", alertName(a));
+      char e[320];
+      if (formatAlertEvent(e, sizeof(e), a, lastTemp)) net::publish(T_ALERT_EVENT, e, false);
+    }
+  }
 }
 
 // Setup mode and "forget Wi-Fi" take the board off the cloud for minutes: tell the broker first.
