@@ -59,7 +59,7 @@ test('assembler handles multi-byte characters by byte offsets', () => {
   assert.equal(bytes.length, 9);
   const a = new LogAssembler(9);
   const first = bytes.slice(0, 5), second = bytes.slice(5);  // splits the euro sign in two
-  const mk = (off, data) => { const h = enc(`1:${off}:8\n`); const out = new Uint8Array(h.length + data.length); out.set(h); out.set(data, h.length); return out; };
+  const mk = (off, data) => { const h = enc(`1:${off}:9\n`); const out = new Uint8Array(h.length + data.length); out.set(h); out.set(data, h.length); return out; };
   assert.equal(a.accept(parseChunk(mk(0, first))), true);
   assert.equal(a.nextOffset(), 5);
   assert.equal(a.accept(parseChunk(mk(5, second))), true);
