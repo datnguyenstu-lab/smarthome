@@ -69,6 +69,7 @@ static bool tempPending = false;   // a conversion was started and not collected
 static void readTemp() {           // collects the conversion started by the loop: no 750 ms stall
   float t = sensors::finishTempRead();
   Serial.printf("DS18B20 raw: %.2f\n", t);  // -127 = not found, 85 = bad power/pull-up
+  if (!tempValid(t)) { bool hi, pres; sensors::busStatus(hi, pres); Serial.printf("DS18B20 bus: line %s, device %s\n", hi ? "high (ok)" : "LOW (short or held low)", pres ? "answers" : "does not answer"); }
   bool valid = tempValid(t);
   bool faulted = tempFault.update(valid);
   if (valid) { lastTemp = t; char b[16]; snprintf(b, sizeof(b), "%.1f", t); pub(T_TEMP, b); }
@@ -87,6 +88,7 @@ static void driveStatusLed(bool setupMode) {
   static Pattern prev = Pattern::None;
   Pattern p = pickPattern(setupMode, net::wifiUp(), net::connected(), healthMonitor::issues(), settings.statusLed,
                       healthMonitor::selfTestRunning());
+  if (p != prev) Serial.printf("Status LED pattern: %s\n", p == Pattern::None ? "none" : p == Pattern::SetupFast ? "setup" : p == Pattern::SelfTest ? "self-test" : p == Pattern::NoWifi ? "no Wi-Fi" : p == Pattern::CloudDown ? "cloud down" : "issue");
   if (p != Pattern::None) leds::drive(1, patternLevel(p, millis()));
   else if (prev != Pattern::None) leds::drive(1, false);
   prev = p;

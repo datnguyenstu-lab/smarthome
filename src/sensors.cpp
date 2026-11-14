@@ -36,6 +36,13 @@ float finishTempRead() {
   return dallas.getTempCByIndex(0);     // -127 when the sensor is missing, as before
 }
 
+void busStatus(bool& lineHigh, bool& present) {
+  pinMode(PIN_DS18, INPUT);
+  delayMicroseconds(100);
+  lineHigh = digitalRead(PIN_DS18) == HIGH;
+  present = ow.reset() == 1;
+}
+
 bool irDetected() { return digitalRead(PIN_IR) == LOW; }
 
 }  // namespace sensors
