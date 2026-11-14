@@ -55,10 +55,10 @@ test('describeIssues unknown code is a warning', () => {
   assert.deepEqual(describeIssues(undefined), []);
 });
 test('isStale offline', () => assert.equal(isStale(1000, 990, 'offline'), true));
-test('isStale fresh health', () => assert.equal(isStale(1000, 900, 'online'), false));
-test('isStale health older than 180 s', () => {
-  assert.equal(isStale(1180, 1000, 'online'), false);
-  assert.equal(isStale(1181, 1000, 'online'), true);
+test('isStale fresh health', () => assert.equal(isStale(1000, 960, 'online'), false));
+test('isStale health older than 60 s (the board reports every 10 s)', () => {
+  assert.equal(isStale(1060, 1000, 'online'), false);
+  assert.equal(isStale(1061, 1000, 'online'), true);
 });
 test('isStale missing ts', () => {
   assert.equal(isStale(1000, undefined, 'online'), true);

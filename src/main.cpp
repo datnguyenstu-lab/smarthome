@@ -57,8 +57,11 @@ static void setAway(bool on) {
   publishAlertIfChanged();
 }
 
-static void readTemp() {
-  lastTemp = sensors::readTempC();
+static const uint32_t TEMP_EVERY_MS = 10000;
+static bool tempPending = false;   // a conversion was started and not collected yet
+
+static void readTemp() {           // collects the conversion started by the loop: no 750 ms stall
+  lastTemp = sensors::finishTempRead();
   Serial.printf("DS18B20 raw: %.2f\n", lastTemp);  // -127 = not found, 85 = bad power/pull-up
   if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
   publishAlertIfChanged();
@@ -151,5 +154,6 @@ void loop() {
   driveStatusLed(false);
   eventLog::tick(now);
 
-  if (now - lastTempMs >= 30000) { lastTempMs = now; readTemp(); }
+  if (!tempPending && now - lastTempMs >= TEMP_EVERY_MS) { lastTempMs = now; sensors::startTempConversion(); tempPending = true; }
+  if (tempPending && sensors::tempConversionReady()) { tempPending = false; readTemp(); }
 }

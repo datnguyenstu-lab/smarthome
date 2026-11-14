@@ -31,7 +31,7 @@ Phase 1 works but is a demo: when something goes wrong you need a serial cable, 
 
 ### Self-test and health
 
-- Board publishes `smarthome/health` (retained, JSON, every 60 s and on change): `rssi`, `heap`, `uptime_s`, `reset_reason`, `wifi_reconnects`, `mqtt_reconnects`, `fw` version, `issues` (list of codes).
+- Board publishes `smarthome/health` (retained, JSON, every 10 s and on change): `rssi`, `heap`, `uptime_s`, `reset_reason`, `wifi_reconnects`, `mqtt_reconnects`, `fw` version, `issues` (list of codes).
 - Issue codes and rules (my calls, tunable in code constants):
   - `temp_fault`: reading is -127 or 85 or out of -40..125 (already exists as an alert).
   - `ir_stuck`: presence held continuously for 30 min while Away is off.
@@ -78,7 +78,7 @@ The yellow LED shows a distinct **self-test pattern** (long on, short pause, sho
 
 ### Reconnect guide (web)
 
-Shown when status is `offline`, or when no `health` message arrived for 3 minutes while status says online (a hung board). Steps: powered? last seen time; same Wi-Fi? hold D1 for 5 s until the fast blink; join `SmartHome-Setup` and choose the new network; the page watches for the board and shows "Connected". A board that is online also gets a **Restart into setup mode** button (`smarthome/cmd/setup`, not retained) with a confirmation.
+Shown when status is `offline`, or when no `health` message arrived for 60 seconds while status says online (a hung board). Steps: powered? last seen time; same Wi-Fi? hold D1 for 5 s until the fast blink; join `SmartHome-Setup` and choose the new network; the page watches for the board and shows "Connected". A board that is online also gets a **Restart into setup mode** button (`smarthome/cmd/setup`, not retained) with a confirmation.
 
 ### Web UI
 

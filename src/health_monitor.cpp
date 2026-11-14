@@ -14,6 +14,7 @@
 namespace healthMonitor {
 
 static const char* FW = FW_VERSION;
+static const uint32_t HEALTH_EVERY_MS = 10000;   // also published at once when the issues change
 static uint8_t mask = 0;
 static uint32_t lastPubMs = 0;
 static logic::HealthInputs in;
@@ -133,7 +134,7 @@ void tick(uint32_t nowMs, bool tempOk, bool away, uint32_t presenceHeldMs) {
     }
   }
   mask = m;
-  if (net::connected() && (changed || lastPubMs == 0 || nowMs - lastPubMs >= 60000)) publishNow();
+  if (net::connected() && (changed || lastPubMs == 0 || nowMs - lastPubMs >= HEALTH_EVERY_MS)) publishNow();
   if (bootPending && net::connected()) { bootPending = false; publishSelfTest(bootTempOk); }
 }
 

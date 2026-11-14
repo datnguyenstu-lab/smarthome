@@ -308,4 +308,4 @@ $('dlLog').addEventListener('click', () => {
   render();
 });
 
-setInterval(() => { if (!$('app').hidden) render(); }, 30000);
+setInterval(() => { if (!$('app').hidden) render(); }, 10000);

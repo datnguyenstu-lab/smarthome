@@ -18,6 +18,24 @@ float readTempC() {
   return dallas.getTempCByIndex(0);
 }
 
+static uint32_t convStartMs = 0;
+static bool converting = false;
+
+void startTempConversion() {
+  dallas.setWaitForConversion(false);   // return at once instead of waiting 750 ms
+  dallas.requestTemperatures();
+  dallas.setWaitForConversion(true);    // readTempC() keeps its blocking behaviour
+  convStartMs = millis();
+  converting = true;
+}
+
+bool tempConversionReady() { return converting && millis() - convStartMs >= 800; }
+
+float finishTempRead() {
+  converting = false;
+  return dallas.getTempCByIndex(0);     // -127 when the sensor is missing, as before
+}
+
 bool irDetected() { return digitalRead(PIN_IR) == LOW; }
 
 }  // namespace sensors
