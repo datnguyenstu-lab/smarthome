@@ -17,6 +17,7 @@ class PresenceHold {
  public:
   explicit PresenceHold(uint32_t holdMs) : holdMs_(holdMs) {}
   bool update(bool detected, uint32_t nowMs);
+  void setHoldMs(uint32_t holdMs) { holdMs_ = holdMs; }
  private:
   uint32_t holdMs_, last_ = 0;
   bool seen_ = false;

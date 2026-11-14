@@ -7,10 +7,10 @@ bool tempValid(float c) {
   return !std::isnan(c) && c != -127.0f && c != 85.0f;
 }
 
-Alert evalAlert(float tempC, bool away, bool presence, Alert prev) {
+Alert evalAlert(float tempC, bool away, bool presence, Alert prev, float hotOnC) {
   if (away && presence) return Alert::Intruder;
   if (!tempValid(tempC)) return Alert::TempFault;
-  if (tempC >= HOT_ON_C || (prev == Alert::Hot && tempC >= HOT_OFF_C)) return Alert::Hot;
+  if (tempC >= hotOnC || (prev == Alert::Hot && tempC >= hotOnC - 1.0f)) return Alert::Hot;
   return Alert::None;
 }
 
