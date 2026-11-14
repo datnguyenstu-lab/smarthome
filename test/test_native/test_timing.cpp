@@ -45,7 +45,40 @@ static void test_longpress_fires_once_then_rearms_on_release() {
   TEST_ASSERT_TRUE(p.update(true, 12000));
 }
 
+static void test_fault_filter_ignores_a_single_bad_read() {
+  FaultFilter f(3);
+  TEST_ASSERT_FALSE(f.update(false));
+  TEST_ASSERT_FALSE(f.update(true));
+}
+static void test_fault_filter_faults_after_three_bad_reads_in_a_row() {
+  FaultFilter f(3);
+  TEST_ASSERT_FALSE(f.update(false));
+  TEST_ASSERT_FALSE(f.update(false));
+  TEST_ASSERT_TRUE(f.update(false));
+  TEST_ASSERT_TRUE(f.update(false));    // stays faulted while reads stay bad
+}
+static void test_fault_filter_clears_at_once_on_a_good_read() {
+  FaultFilter f(3);
+  f.update(false); f.update(false); f.update(false);
+  TEST_ASSERT_FALSE(f.update(true));
+  TEST_ASSERT_FALSE(f.update(false));   // the count starts again from zero
+}
+static void test_fault_filter_needs_consecutive_bad_reads() {
+  FaultFilter f(3);
+  const bool reads[] = {false, false, true, false, false, true, false};   // the flapping seen on the real sensor
+  for (bool r : reads) TEST_ASSERT_FALSE(f.update(r));
+}
+static void test_fault_filter_limit_one_faults_at_once() {
+  FaultFilter f(1);
+  TEST_ASSERT_TRUE(f.update(false));
+}
+
 void run_timing_tests() {
+  RUN_TEST(test_fault_filter_ignores_a_single_bad_read);
+  RUN_TEST(test_fault_filter_faults_after_three_bad_reads_in_a_row);
+  RUN_TEST(test_fault_filter_clears_at_once_on_a_good_read);
+  RUN_TEST(test_fault_filter_needs_consecutive_bad_reads);
+  RUN_TEST(test_fault_filter_limit_one_faults_at_once);
   RUN_TEST(test_debouncer_ignores_short_blip);
   RUN_TEST(test_debouncer_accepts_stable_change);
   RUN_TEST(test_presence_hold_boundaries);

@@ -19,6 +19,7 @@ using namespace logic;
 
 static Debouncer btn1(30), btn2(30);
 static LongPress btn1Long(5000);
+static FaultFilter tempFault(3);         // three bad temperature reads in a row (30 s) make a fault
 static Debouncer doorDebounce(300);   // the IR sensor is the door sensor: a change must hold for 300 ms
 static Settings settings;
 static uint32_t connectMs = 0;
@@ -60,9 +61,12 @@ static const uint32_t TEMP_EVERY_MS = 10000;
 static bool tempPending = false;   // a conversion was started and not collected yet
 
 static void readTemp() {           // collects the conversion started by the loop: no 750 ms stall
-  lastTemp = sensors::finishTempRead();
-  Serial.printf("DS18B20 raw: %.2f\n", lastTemp);  // -127 = not found, 85 = bad power/pull-up
-  if (tempValid(lastTemp)) { char b[16]; snprintf(b, sizeof(b), "%.1f", lastTemp); pub(T_TEMP, b); }
+  float t = sensors::finishTempRead();
+  Serial.printf("DS18B20 raw: %.2f\n", t);  // -127 = not found, 85 = bad power/pull-up
+  bool valid = tempValid(t);
+  bool faulted = tempFault.update(valid);
+  if (valid) { lastTemp = t; char b[16]; snprintf(b, sizeof(b), "%.1f", t); pub(T_TEMP, b); }
+  else if (faulted) lastTemp = NAN;   // a short glitch keeps the last good value; only a lasting fault shows
   publishAlertIfChanged();
 }
 
@@ -146,8 +150,8 @@ void loop() {
 
   bool b1 = btn1.update(digitalRead(PIN_BTN1) == LOW, now);
   bool b2 = btn2.update(digitalRead(PIN_BTN2) == LOW, now);
-  if (b1 && !btn1Prev) setLed(2, !leds::get(2));  // D1 button -> middle light
-  if (b2 && !btn2Prev) setLed(3, !leds::get(3));  // D4 button -> yellow light
+  if (b1 && !btn1Prev) setLed(2, !leds::get(2));  // D1 button -> middle light (main storage)
+  if (b2 && !btn2Prev) setLed(3, !leds::get(3));  // D4 button -> right light (secondary storage)
   btn1Prev = b1; btn2Prev = b2;
   if (btn1Long.update(b1, now)) wifiSetup::startPortal();
 

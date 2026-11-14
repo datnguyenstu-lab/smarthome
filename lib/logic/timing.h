@@ -33,4 +33,18 @@ class LongPress {
   bool down_ = false, fired_ = false;
 };
 
+// A sensor is reported faulty only after `limit` bad reads in a row; one good read clears it at once. A single
+// glitch (a loose wire, noise on the bus) therefore does not flip the alarm.
+class FaultFilter {
+ public:
+  explicit FaultFilter(int limit) : limit_(limit) {}
+  bool update(bool readWasValid) {
+    if (readWasValid) bad_ = 0;
+    else if (bad_ < limit_) bad_++;
+    return bad_ >= limit_;
+  }
+ private:
+  int limit_, bad_ = 0;
+};
+
 }  // namespace logic

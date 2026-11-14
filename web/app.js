@@ -116,7 +116,7 @@ function renderSettings() {
 
 function updateGuide() {
   if (!ready || !connected) return;
-  const gs = guideState({ status: state.status, healthTs: state.health?.ts, nowSec: nowSec() });
+  const gs = guideState({ status: state.status, healthTs: state.health?.ts, nowSec: nowSec(), liveAtSec: state.healthLiveAt });
   if (gs === 'ok') {
     guideDismissed = false;
     if (view === 'guide' && !celebrating) {
@@ -158,7 +158,7 @@ function renderAbout() {
 
 function render() { renderHome(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
 
-function handle(topic, buf) {
+function handle(topic, buf, packet) {
   const v = buf.toString();
   const t = topic.replace(/^smarthome\//, '');
   if (t === 'status') state.status = v;
@@ -168,7 +168,7 @@ function handle(topic, buf) {
   else if (t === 'alert') state.alert = v;
   else if (t === 'state/away') { const o = onOff(v); if (o !== null) state.away = o; }
   else if (t === 'state/led2' || t === 'state/led3') { const o = onOff(v); if (o !== null) state.led[t.slice(-1)] = o; }
-  else if (t === 'health') state.health = json(buf);
+  else if (t === 'health') { state.health = json(buf); if (!packet?.retain) state.healthLiveAt = nowSec(); }
   else if (t === 'settings') state.settings = json(buf);
   else if (t === 'info') state.info = json(buf);
   else if (t === 'about') state.about = describeAbout(json(buf));
@@ -194,9 +194,9 @@ function connect(username, password) {
     setTimeout(() => { ready = true; render(); }, 2000);  // let the retained messages arrive before judging the board
     render();
   });
-  client.on('message', handle);
+  client.on('message', (topic, buf, packet) => handle(topic, buf, packet));
   client.on('error', (e) => { if (!everConnected) fail(e); });
-  client.on('close', () => { connected = false; if (everConnected) { ready = false; state.status = undefined; render(); } });
+  client.on('close', () => { connected = false; if (everConnected) { ready = false; state.status = undefined; state.healthLiveAt = undefined; render(); } });
   setTimeout(() => { if (!everConnected) fail(); }, 12000);
 }
 
