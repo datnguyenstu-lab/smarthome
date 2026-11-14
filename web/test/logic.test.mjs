@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText } from '../logic.js';
+import { describeBanner, ageText, onOff, describeIssues, isStale, guideState, validateSettings, settingsMessage, lastSeenText, formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText } from '../logic.js';
 
 test('offline beats any alert', () => {
   assert.deepEqual(describeBanner({ alert: 'hot', status: 'offline' }), { level: 'error', text: 'Board offline' });
@@ -103,4 +103,62 @@ test('settingsMessage is valid JSON with the three keys', () => {
 test('lastSeenText', () => {
   assert.equal(lastSeenText(1300, 1000), 'last seen 5 min ago');
   assert.equal(lastSeenText(1300, undefined), 'not seen yet');
+});
+
+test('formatUptime units', () => {
+  assert.equal(formatUptime(30), 'just started');
+  assert.equal(formatUptime(90), '1 min');
+  assert.equal(formatUptime(3600), '1 hour');
+  assert.equal(formatUptime(7300), '2 hours');
+  assert.equal(formatUptime(86400), '1 day');
+  assert.equal(formatUptime(259200), '3 days');
+  assert.equal(formatUptime(undefined), '');
+  assert.equal(formatUptime(-5), '');
+});
+test('signalText bands', () => {
+  assert.equal(signalText(-45), 'Strong');
+  assert.equal(signalText(-55), 'Strong');
+  assert.equal(signalText(-60), 'Good');
+  assert.equal(signalText(-75), 'Fair');
+  assert.equal(signalText(-80), 'Fair');
+  assert.equal(signalText(-81), 'Weak');
+  assert.equal(signalText(undefined), '--');
+});
+test('resetText names', () => {
+  assert.equal(resetText('power'), 'Power on');
+  assert.equal(resetText('external'), 'Reset button');
+  assert.equal(resetText('soft'), 'Restarted by software');
+  assert.equal(resetText('watchdog'), 'Crash recovery');
+  assert.equal(resetText('exception'), 'Crash recovery');
+  assert.equal(resetText('whatever'), 'Unknown');
+});
+test('dialFraction clamps to 0..1 over 20..60', () => {
+  assert.equal(dialFraction(20), 0);
+  assert.equal(dialFraction(40), 0.5);
+  assert.equal(dialFraction(60), 1);
+  assert.equal(dialFraction(10), 0);
+  assert.equal(dialFraction(99), 1);
+  assert.equal(dialFraction(NaN), 0);
+  assert.equal(dialFraction(undefined), 0);
+});
+test('sameSettings compares the three values', () => {
+  const a = { hot_on_c: 35, presence_hold_s: 5, status_led: true };
+  assert.equal(sameSettings(a, { ...a, hot_on_c: 35.04 }), true);
+  assert.equal(sameSettings(a, { ...a, hot_on_c: 36 }), false);
+  assert.equal(sameSettings(a, { ...a, presence_hold_s: 6 }), false);
+  assert.equal(sameSettings(a, { ...a, status_led: false }), false);
+  assert.equal(sameSettings(a, undefined), false);
+});
+test('describeSelfTest', () => {
+  assert.deepEqual(describeSelfTest({ checks: [{ name: 'temp', ok: true }, { name: 'wifi', ok: true }] }), { ok: true, failed: [], text: 'All checks passed' });
+  const r = describeSelfTest({ checks: [{ name: 'temp', ok: false }, { name: 'ir', ok: true }, { name: 'cloud', ok: false }] });
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.failed, ['temp', 'cloud']);
+  assert.equal(r.text, 'Needs a look: temperature sensor, cloud link');
+  assert.equal(describeSelfTest(undefined), null);
+  assert.equal(describeSelfTest({}), null);
+});
+test('memoryText', () => {
+  assert.equal(memoryText(14624), '14 KB');
+  assert.equal(memoryText(undefined), '');
 });

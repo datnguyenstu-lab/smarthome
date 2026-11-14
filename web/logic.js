@@ -83,3 +83,46 @@ export function lastSeenText(nowSec, thenSec) {
   const a = ageText(nowSec, thenSec);
   return a ? `last seen ${a}` : 'not seen yet';
 }
+
+export function formatUptime(s) {
+  if (typeof s !== 'number' || !Number.isFinite(s) || s < 0) return '';
+  if (s < 60) return 'just started';
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) { const h = Math.floor(s / 3600); return `${h} ${h === 1 ? 'hour' : 'hours'}`; }
+  const d = Math.floor(s / 86400);
+  return `${d} ${d === 1 ? 'day' : 'days'}`;
+}
+
+export function signalText(rssi) {
+  if (typeof rssi !== 'number' || !Number.isFinite(rssi)) return '--';
+  if (rssi >= -55) return 'Strong';
+  if (rssi >= -67) return 'Good';
+  if (rssi >= -80) return 'Fair';
+  return 'Weak';
+}
+
+const RESETS = { power: 'Power on', external: 'Reset button', soft: 'Restarted by software', watchdog: 'Crash recovery', soft_watchdog: 'Crash recovery', exception: 'Crash recovery', deep_sleep: 'Woke from sleep' };
+export function resetText(reason) { return RESETS[reason] ?? 'Unknown'; }
+
+export function dialFraction(tempC, min = 20, max = 60) {
+  const t = Number(tempC);
+  if (!Number.isFinite(t)) return 0;
+  return Math.min(1, Math.max(0, (t - min) / (max - min)));
+}
+
+export function sameSettings(a, b) {
+  if (!a || !b) return false;
+  return Math.abs(Number(a.hot_on_c) - Number(b.hot_on_c)) < 0.05 && Number(a.presence_hold_s) === Number(b.presence_hold_s) && a.status_led === b.status_led;
+}
+
+const CHECK_NAMES = { temp: 'temperature sensor', ir: 'presence sensor', wifi: 'Wi-Fi', cloud: 'cloud link' };
+export function describeSelfTest(result) {
+  if (!result || !Array.isArray(result.checks)) return null;
+  const failed = result.checks.filter((c) => !c.ok).map((c) => c.name);
+  if (!failed.length) return { ok: true, failed, text: 'All checks passed' };
+  return { ok: false, failed, text: `Needs a look: ${failed.map((n) => CHECK_NAMES[n] ?? n).join(', ')}` };
+}
+
+export function memoryText(bytes) {
+  return typeof bytes === 'number' && Number.isFinite(bytes) ? `${Math.round(bytes / 1024)} KB` : '';
+}
