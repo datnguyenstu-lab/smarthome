@@ -5,6 +5,7 @@ void run_alerts_tests();
 void run_timing_tests();
 void run_topics_tests();
 void run_settings_tests();
+void run_health_tests();
 
 void setUp() {}
 void tearDown() {}
@@ -18,5 +19,6 @@ int main() {
   run_timing_tests();
   run_topics_tests();
   run_settings_tests();
+  run_health_tests();
   return UNITY_END();
 }
