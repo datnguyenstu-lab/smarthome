@@ -83,8 +83,8 @@ void loop() {
 
   bool b1 = btn1.update(digitalRead(PIN_BTN1) == LOW, now);
   bool b2 = btn2.update(digitalRead(PIN_BTN2) == LOW, now);
-  if (b1 && !btn1Prev) setLed(1, !leds::get(1));
-  if (b2 && !btn2Prev) setLed(2, !leds::get(2));
+  if (b1 && !btn1Prev) setLed(2, !leds::get(2));  // D1 button -> middle light
+  if (b2 && !btn2Prev) setLed(1, !leds::get(1));  // D4 button -> right light
   btn1Prev = b1; btn2Prev = b2;
   if (btn1Long.update(b1, now)) wifiSetup::startPortal();
 
