@@ -2,17 +2,24 @@ import { describeBanner, ageText, onOff, describeIssues, guideState, validateSet
   formatUptime, signalText, resetText, dialFraction, sameSettings, describeSelfTest, memoryText, describeVersions, formatBuild, describeAbout, describeDoor, doorRowState, describeConnectError, connectErrorText } from './logic.js';
 import { parseChunk, LogAssembler, requestMessage, buildLogHeader } from './logsync.js';
 import { t, setLang, getLang, detectLang } from './i18n.js';
+import { addSample, analyze, describePrediction, recentStats, demoPoint, DEMO_STEPS } from './predictor.js';
+import { createAssistant, answerFor, speakable, isGoodbye } from './assistant.js';
+import { fingerprintAvailable, fingerprintEnrolled, enrollFingerprint, verifyFingerprint } from './auth.js';
+import { listenSupported, listenOnce, speak, stopSpeaking } from './voice.js';
 
 const BROKER = 'wss://hff38f13.ala.asia-southeast1.emqxsl.com:8084/mqtt';
+// The address of the assistant proxy (worker/, deployed on Cloudflare). Empty: the assistant uses its built-in rules only.
+// The address is public; the DeepSeek key stays in the proxy, and the page only holds the person's access code.
+const ASSISTANT_URL = '';
 const APP_VERSION = '2.0.0';  // the page's own release: keep major.minor equal to the board firmware's
 const LIGHTS = { 2: 'Main storage', 3: 'Secondary storage' };  // led 1 (yellow) is the board's status light, not shown
 const DEFAULTS = { hot_on_c: 33, door_open_s: 10, status_led: true };
-const VIEWS = { home: 'viewHome', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide', about: 'viewAbout' };
+const VIEWS = { home: 'viewHome', assistant: 'viewAssistant', cooler: 'viewCooler', health: 'viewHealth', settings: 'viewSettings', guide: 'viewGuide', about: 'viewAbout' };
 const $ = (id) => document.getElementById(id);
 const nowSec = () => Date.now() / 1000;
 
 const state = { status: undefined, temp: undefined, door: undefined, doorChanged: undefined, alert: 'none',
-  away: false, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null, about: null };
+  away: false, cool: null, servo: null, led: { 2: false, 3: false }, health: null, selftest: null, settings: null, info: null, about: null };
 let client = null, everConnected = false, connected = false, ready = false;
 let view = 'home', guideDismissed = false, celebrating = false;
 let pending = null, dirty = false;                 // settings sent and waiting for the echo / person is editing
@@ -21,6 +28,8 @@ let dl = null;  // log download in progress: {files, i, asm, texts, retries, tim
 let dlMsg = { key: 'Saves what the board has recorded: restarts, Wi-Fi drops, problems and setting changes.', vars: null, cls: '' };
 let dlLabel = 'Download log';   // English keys: they are translated each time the screen is drawn
 let loginErrorKind = null;
+let samples = [];   // the last 15 minutes of real temperature readings, for the AI predictor
+const demo = { on: false, step: 0, timer: null, samples: [], cur: null };   // demo mode: a simulated door-left-open story
 
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 function alertBlock(title, detail, cls) { const d = el('div', 'alertb' + (cls ? ' ' + cls : '')); d.append(el('b', '', title)); if (detail) d.append(detail); return d; }
@@ -33,15 +42,28 @@ function setView(v) {
   render();
 }
 
+const hotLimit = () => (state.settings ? Number(state.settings.hot_on_c) : DEFAULTS.hot_on_c);
+const currentSamples = () => (demo.on ? demo.samples : samples);
+const analysis = () => analyze(currentSamples(), hotLimit());
+
 function renderHome() {
-  const online = state.status === 'online';
+  const realOnline = state.status === 'online';
+  const dm = demo.cur;                       // in demo mode the simulated readings replace the live ones on this screen
+  const online = realOnline || !!dm;
+  const an = analysis();
+  const alertNow = dm ? (an.kind === 'over' ? 'hot' : 'none') : state.alert;
+  const tempText = dm ? dm.c.toFixed(1) : state.temp;   // one decimal, like the board's own readings
   $('status').className = 'status' + (online ? ' online' : '');
   $('statusText').textContent = online ? t('online') : t('offline');
+  $('demoBar').hidden = !demo.on;
+  const pd = online ? describePrediction(an) : null;
+  $('aiCard').hidden = !pd;
+  if (pd) { $('aiCard').className = 'aicard ' + pd.level; $('aiText').textContent = pd.text; }
 
-  const hasTemp = online && state.temp !== undefined && state.temp !== '';
-  const tempC = Number(state.temp);
-  const hot = state.settings ? Number(state.settings.hot_on_c) : DEFAULTS.hot_on_c;
-  $('temp').textContent = hasTemp ? state.temp : '--';
+  const hasTemp = online && tempText !== undefined && tempText !== '';
+  const tempC = Number(tempText);
+  const hot = hotLimit();
+  $('temp').textContent = hasTemp ? tempText : '--';
   $('arc').setAttribute('stroke-dasharray', `${((hasTemp ? dialFraction(tempC) : 0) * 314.16).toFixed(1)} 400`);
   $('arc').setAttribute('stroke', hasTemp && tempC >= hot ? 'var(--bad)' : 'var(--ok)');
   const th = Math.PI * (1 - dialFraction(hot)), c = Math.cos(th), s = Math.sin(th);
@@ -52,9 +74,10 @@ function renderHome() {
   lab.setAttribute('x', (120 + 124 * c).toFixed(1)); lab.setAttribute('y', Math.max(9, 120 - 124 * s).toFixed(1));
   lab.textContent = t('alert at {n}°', { n: hot });
 
-  const d = describeDoor(state.door, state.doorChanged, nowSec());   // the IR sensor is the door sensor
+  const doorNow = dm ? dm.door : state.door;
+  const d = describeDoor(doorNow, dm ? undefined : state.doorChanged, nowSec());   // the IR sensor is the door sensor
   $('door').textContent = online ? d.label : '--';
-  const rowState = doorRowState({ online, door: state.door, alert: state.alert });
+  const rowState = doorRowState({ online, door: doorNow, alert: alertNow });
   const grace = Number(state.settings?.door_open_s);
   $('age').textContent = online && d.since ? t('since {ago}', { ago: d.since }) + (rowState === 'watch' && grace > 0 ? ' · ' + t('warns after {n} s', { n: grace }) : '') : '';
   $('doorRow').classList.toggle('alarm', rowState === 'alarm');
@@ -64,22 +87,22 @@ function renderHome() {
     b.querySelector('.lname').textContent = t(LIGHTS[n]);
     b.setAttribute('aria-label', t(LIGHTS[n]));
     b.setAttribute('aria-pressed', String(!!state.led[n]));
-    b.disabled = !online;
+    b.disabled = !realOnline;
   }
   $('away').setAttribute('aria-checked', String(state.away));
-  $('away').disabled = !online;
+  $('away').disabled = !realOnline;
 
-  const issues = online ? describeIssues(state.health?.issues) : [];
+  const issues = realOnline ? describeIssues(state.health?.issues) : [];
   const box = $('alerts');
   box.replaceChildren();
   if (online) {
-    const b = describeBanner({ alert: state.alert, status: state.status });
-    const covered = state.alert === 'temp_fault' && issues.some((i) => i.code === 'temp_fault');
+    const b = describeBanner({ alert: alertNow, status: 'online' });
+    const covered = alertNow === 'temp_fault' && issues.some((i) => i.code === 'temp_fault');
     if (b.level !== 'ok' && !covered) box.append(alertBlock(b.text, '', b.level === 'warn' ? 'warn' : ''));
     for (const i of issues) box.append(alertBlock(i.text, i.fix, ''));
   }
   $('healthLine').textContent = issues.length ? t(issues.length > 1 ? '{n} problems found' : '{n} problem found', { n: issues.length }) : t('Health: no problems found');
-  $('guideLink').hidden = !(connected && ready && state.status !== 'online');
+  $('guideLink').hidden = !(connected && ready && state.status !== 'online' && !demo.on);
 }
 
 function renderHealth() {
@@ -124,7 +147,7 @@ function renderSettings() {
 }
 
 function updateGuide() {
-  if (!ready || !connected) return;
+  if (!ready || !connected || demo.on) return;
   const gs = guideState({ status: state.status, healthTs: state.health?.ts, nowSec: nowSec(), liveAtSec: state.healthLiveAt });
   if (gs === 'ok') {
     guideDismissed = false;
@@ -172,16 +195,18 @@ function renderConnBar() {
   if (!connected) bar.textContent = navigator.onLine === false ? t('No internet connection. Reconnecting…') : t('Connection to the cloud lost. Reconnecting…');
 }
 
-function render() { renderConnBar(); renderHome(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
+function render() { renderConnBar(); renderHome(); renderCooler(); renderAssistant(); renderHealth(); renderSettings(); renderAbout(); updateGuide(); }
 
 function handle(topic, buf, packet) {
   const v = buf.toString();
   const sub = topic.replace(/^smarthome\//, '');
   if (sub === 'status') state.status = v;
-  else if (sub === 'temp') state.temp = v;
+  else if (sub === 'temp') { state.temp = v; samples = addSample(samples, nowSec(), Number(v)); }
   else if (sub === 'door') state.door = v;
   else if (sub === 'door_changed') state.doorChanged = Number(v);
   else if (sub === 'alert') state.alert = v;
+  else if (sub === 'state/cool') state.cool = json(buf);
+  else if (sub === 'state/door_servo') state.servo = v;
   else if (sub === 'state/away') { const o = onOff(v); if (o !== null) state.away = o; }
   else if (sub === 'state/led2' || sub === 'state/led3') { const o = onOff(v); if (o !== null) state.led[sub.slice(-1)] = o; }
   else if (sub === 'health') { state.health = json(buf); if (!packet?.retain) state.healthLiveAt = nowSec(); }
@@ -338,6 +363,246 @@ $('dlLog').addEventListener('click', () => {
   publish('smarthome/cmd/log', requestMessage('list'));
   dl.timer = setTimeout(() => dlFail('The board did not answer. Try again.'), 8000);
   render();
+});
+
+// ---- Demo mode: replays a simulated "door left open" story into the predictor and the Home screen; the board is not touched ----
+function demoTick() {
+  const p = demoPoint(demo.step, hotLimit());
+  demo.samples = addSample(demo.samples, p.t, p.c);
+  demo.cur = p;
+  if (++demo.step >= DEMO_STEPS) { clearInterval(demo.timer); demo.timer = null; }
+  render();
+}
+function stopDemo() { clearInterval(demo.timer); Object.assign(demo, { on: false, step: 0, timer: null, samples: [], cur: null }); render(); }
+function startDemo() {
+  stopDemo();
+  demo.on = true;
+  demoTick();
+  demo.timer = setInterval(demoTick, 1000);
+  setView('home');
+}
+$('demoBtn').addEventListener('click', () => (demo.on ? stopDemo() : startDemo()));
+$('demoStop').addEventListener('click', stopDemo);
+
+// ---- Assistant: what it can see, what it can do, and the language model behind it ----
+function snapshot() {
+  const dm = demo.cur, an = analysis();
+  const online = state.status === 'online' || !!dm;
+  const raw = dm ? dm.c : (state.temp === undefined || state.temp === '' ? NaN : Number(state.temp));
+  return { online, demo: !!dm, tempC: online && Number.isFinite(raw) ? Math.round(raw * 10) / 10 : null, hotC: hotLimit(), door: dm ? dm.door : state.door,
+    lights: { main: !!state.led[2], secondary: !!state.led[3] }, away: state.away, alert: dm ? (an.kind === 'over' ? 'hot' : 'none') : state.alert,
+    issues: state.status === 'online' ? (state.health?.issues ?? []) : [], prediction: an, recent: recentStats(currentSamples()) };
+}
+
+const waitFor = async (cond, ms = 3000) => {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (cond()) return true; await new Promise((r) => setTimeout(r, 100)); }
+  return cond();
+};
+// Runs a confirmed action and says it worked only once the board's own state message agrees.
+async function actOnStorage(name, args) {
+  if (demo.on) return { ok: false, reason: 'demo' };
+  if (state.status !== 'online') return { ok: false, reason: 'offline' };
+  if (name === 'set_lock') {
+    if (!(await verifyFingerprint()).ok) return { ok: false, reason: 'fingerprint' };   // lock-up mode needs the fingerprint again
+    publish('smarthome/cmd/away', args.on ? 'on' : 'off', true);
+    return { ok: await waitFor(() => state.away === args.on) };
+  }
+  const ids = args.light === 'main' ? [2] : args.light === 'secondary' ? [3] : [2, 3];
+  for (const n of ids) if (state.led[n] !== args.on) publish(`smarthome/cmd/led${n}`, args.on ? 'on' : 'off');
+  return { ok: await waitFor(() => ids.every((n) => state.led[n] === args.on)) };
+}
+
+let aiStatus = 'unknown';   // unknown | ok | denied | down
+function accessCode() { try { return localStorage.getItem('aiCode') || ''; } catch { return ''; } }
+async function askLLM(messages, tools) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const res = await fetch(ASSISTANT_URL, { method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json', 'x-access-code': accessCode() }, body: JSON.stringify({ messages, tools }) });
+    if (res.status === 401) { aiStatus = 'denied'; throw new Error('access code'); }
+    if (!res.ok) throw new Error('http ' + res.status);
+    const { message } = await res.json();
+    aiStatus = 'ok';
+    return message;
+  } catch (e) { if (aiStatus !== 'denied') aiStatus = 'down'; throw e; }
+  finally { clearTimeout(timer); }
+}
+const buildAssistant = () => createAssistant({ snapshot, act: actOnStorage, llm: ASSISTANT_URL && accessCode() ? askLLM : null });
+let assistant = buildAssistant();
+
+let fpAvail = null, fpNote = { key: '', cls: '' };
+fingerprintAvailable().then((v) => { fpAvail = v; render(); });
+let coolTouched = 0;   // the person is moving the target slider: do not overwrite it with the board's echo
+function coolStatus(c) {
+  if (!c) return t('Waiting for the board.');
+  if (c.reason === 'off') return t('Cooling is off.');
+  if (c.reason === 'inside_sensor') return t('Stopped: the inside temperature sensor is missing.');
+  if (c.reason === 'hot_sensor') return t('Stopped: the hot-side sensor is missing.');
+  if (c.reason === 'overheat') return t('Stopped: the hot side is too hot. Check the fan and the vents.');
+  if (c.reason === 'no_cooling') return t('Stopped: the box did not cool in 10 minutes. Check the Peltier, then switch cooling off and on.');
+  return c.peltier > 0 ? t('Cooling.') : t('At the target. The Peltier is resting.');
+}
+function renderCooler() {
+  const c = state.cool, online = state.status === 'online';
+  $('cIn').textContent = state.temp ?? '--';
+  $('cHot').textContent = c && c.hot_c != null ? Number(c.hot_c).toFixed(0) : '--';
+  $('cPel').textContent = c ? `${c.peltier}%` : '--';
+  $('cFan').textContent = c ? `${c.fan}%` : '--';
+  $('cDoor').textContent = state.servo === 'open' ? t('Open') : state.servo === 'closed' ? t('Closed') : '--';
+  $('cStatus').textContent = coolStatus(c);
+  $('coolOn').setAttribute('aria-checked', String(!!c?.on));
+  if (c && Date.now() - coolTouched > 3000) $('coolTarget').value = c.target_c;
+  $('coolTargetVal').textContent = $('coolTarget').value;
+  for (const id of ['coolOn', 'coolTarget', 'doorOpen', 'doorClose']) $(id).disabled = !online;
+  $('cLock').hidden = !state.away;
+}
+const sendCool = (on) => publish('smarthome/cmd/cool', JSON.stringify({ on, target_c: Number($('coolTarget').value) }), true);
+$('coolOn').addEventListener('click', () => sendCool(!state.cool?.on));
+$('coolTarget').addEventListener('input', () => { coolTouched = Date.now(); $('coolTargetVal').textContent = $('coolTarget').value; });
+$('coolTarget').addEventListener('change', () => { coolTouched = Date.now(); sendCool(!!state.cool?.on); });
+$('doorOpen').addEventListener('click', () => publish('smarthome/cmd/door', 'open'));
+$('doorClose').addEventListener('click', () => publish('smarthome/cmd/door', 'close'));
+
+function renderAssistant() {
+  $('fpState').textContent = fpAvail === false ? t('Not available on this device') : fingerprintEnrolled() ? t('Ready') : t('Not set up');
+  $('fpSetup').hidden = fpAvail === false || fingerprintEnrolled();
+  $('fpNote').textContent = fpNote.key ? t(fpNote.key) : '';
+  $('fpNote').className = 'note ' + fpNote.cls;
+  const hasCode = !!accessCode();
+  $('aiMode').textContent = !ASSISTANT_URL ? t('AI service not set up. The assistant uses built-in rules.')
+    : !hasCode ? t('Enter the access code to use the AI service. Until then the assistant uses built-in rules.')
+    : aiStatus === 'denied' ? t('The AI service refused the access code.')
+    : aiStatus === 'down' ? t('The AI service did not answer. The assistant uses built-in rules.')
+    : aiStatus === 'ok' ? t('AI service connected.') : t('AI service ready.');
+  $('aiCode').hidden = !ASSISTANT_URL; $('aiSave').hidden = !ASSISTANT_URL;
+  $('demoBtn').textContent = demo.on ? t('Stop demo') : t('Play demo: door left open');
+}
+$('aiSave').addEventListener('click', () => {
+  try { localStorage.setItem('aiCode', $('aiCode').value.trim()); } catch { /* not remembered */ }
+  $('aiCode').value = ''; aiStatus = 'unknown'; assistant = buildAssistant(); render();
+});
+$('fpSetup').addEventListener('click', async () => {
+  const r = await enrollFingerprint();
+  fpNote = r.ok ? { key: 'Fingerprint set up.', cls: 'good' } : { key: r.reason === 'cancelled' ? 'Cancelled. Fingerprint was not set up.' : 'Could not set up the fingerprint on this device.', cls: 'bad' };
+  render();
+});
+
+function chat(who, text) {
+  const p = el('p', who, text);
+  $('chatLog').append(p);
+  $('chatLog').scrollTop = $('chatLog').scrollHeight;
+}
+async function ask(text) {
+  const r = await assistant.handle(text);
+  if (r.reply) chat('ai', r.reply);
+  render();
+  return r;
+}
+$('chatForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const v = $('chatIn').value.trim();
+  $('chatIn').value = '';
+  if (!v) return;
+  chat('me', v);
+  await ask(v);
+});
+
+// ---- The call: fingerprint first, then a spoken back-and-forth until someone hangs up ----
+let call = null;
+const callNotes = (msg) => document.querySelectorAll('.callnote').forEach((n) => { n.textContent = msg; });
+async function ensureFingerprint() {
+  if (fpAvail === null) fpAvail = await fingerprintAvailable();
+  if (!fpAvail) return { ok: false, message: t('Fingerprint is not available on this device, so the call cannot start.') };
+  if (!fingerprintEnrolled()) {
+    const e = await enrollFingerprint();   // setting it up is itself a fingerprint check
+    return e.ok ? { ok: true } : { ok: false, message: t('Could not set up the fingerprint on this device.') };
+  }
+  return (await verifyFingerprint()).ok ? { ok: true } : { ok: false, message: t('Fingerprint check failed. The call did not start.') };
+}
+function setCall(name) {
+  $('call').dataset.state = name;
+  $('callState').textContent = name === 'listening' ? t('Listening…') : name === 'thinking' ? t('Thinking…') : name === 'speaking' ? t('Speaking… tap to interrupt') : '';
+}
+async function say(c, text) {
+  if (c.ended) return;
+  chat('ai', text);
+  $('callText').textContent = text;
+  setCall('speaking');
+  await speak(speakable(text), getLang());
+}
+function hear(c) {
+  if (c.queued) { const q = c.queued; c.queued = null; return Promise.resolve(q); }
+  c.listenCtl = new AbortController();
+  const typed = new Promise((res) => { c.onTyped = (txt) => { res(txt); c.listenCtl.abort(); }; });
+  const spoken = listenSupported() && !c.typedOnly ? listenOnce(getLang(), c.listenCtl.signal) : new Promise(() => {});   // no recognition: wait for typing
+  return Promise.race([typed, spoken]).finally(() => { c.onTyped = null; });
+}
+function hangUp(c) {
+  if (!c || c.ended) return;
+  c.ended = true;
+  clearInterval(c.timer);
+  c.listenCtl?.abort(); c.onTyped?.('');
+  stopSpeaking();
+  assistant.cancel();
+  $('call').hidden = true;
+  document.body.style.overflow = '';
+  call = null;
+}
+async function runCall(c) {
+  await say(c, t('Hello. Here is the storage status.') + ' ' + answerFor('all', snapshot()));
+  while (!c.ended) {
+    setCall('listening');
+    let heard = '';
+    try { heard = await hear(c); }
+    catch (e) {
+      if (c.ended) break;
+      if (/not-allowed/.test(e.message)) { await say(c, t('The microphone is blocked. Allow microphone access for this page, then call again.')); break; }
+      c.typedOnly = true;   // keep the call, but only by typing
+      const msg = e.message === 'network' ? t('Speech recognition needs an internet connection. You can type your message.') : t('I could not hear you. Check the microphone, or type your message.');
+      $('callText').textContent = msg;
+      continue;
+    }
+    if (c.ended) break;
+    if (!heard) {
+      c.silent++;
+      if (c.silent === 3) await say(c, t('Are you still there?'));
+      else if (c.silent >= 5) { await say(c, t('I did not hear anything, so I am ending the call. Call again any time.')); break; }
+      continue;
+    }
+    c.silent = 0;
+    chat('me', heard);
+    $('callText').textContent = heard;
+    if (isGoodbye(heard)) { await say(c, t('Goodbye.')); break; }
+    setCall('thinking');
+    const r = await assistant.handle(heard);
+    render();
+    if (r.reply) await say(c, r.reply);
+  }
+  hangUp(c);
+}
+async function startCall() {
+  if (call) return;
+  callNotes('');
+  const fp = await ensureFingerprint();
+  if (!fp.ok) { callNotes(fp.message); return; }
+  const c = call = { ended: false, silent: 0, typedOnly: false, queued: null, listenCtl: null, onTyped: null, started: Date.now(), timer: null };
+  c.timer = setInterval(() => { const s = Math.floor((Date.now() - c.started) / 1000); $('callTimer').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 1000);
+  $('callTimer').textContent = '0:00'; $('callText').textContent = '';
+  $('call').hidden = false;
+  document.body.style.overflow = 'hidden';
+  runCall(c);
+}
+$('callBtn').addEventListener('click', startCall);
+$('callBtn2').addEventListener('click', startCall);
+$('hangup').addEventListener('click', () => hangUp(call));
+$('avatar').addEventListener('click', stopSpeaking);   // tap to interrupt the assistant
+$('callForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('callIn').value.trim();
+  $('callIn').value = '';
+  if (!v || !call) return;
+  stopSpeaking();
+  if (call.onTyped) call.onTyped(v); else call.queued = v;
 });
 
 // ---- Language: the saved choice, else the browser's language; every label is drawn through t() ----

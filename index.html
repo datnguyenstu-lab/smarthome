@@ -27,6 +27,7 @@
 
   <section id="app" hidden>
     <div id="connBar" class="connbar" role="status" hidden></div>
+    <div id="demoBar" class="demobar" role="status" hidden><span data-i18n>Demo mode: simulated readings</span><button class="linkbtn" id="demoStop" data-i18n>Stop demo</button></div>
     <!-- Home -->
     <div id="viewHome">
       <div class="top"><span data-i18n>Cold storage</span><span id="status" class="status"><i></i><span id="statusText">offline</span></span></div>
@@ -41,12 +42,17 @@
         <div class="num"><span id="temp">--</span><small>°C</small></div>
       </div>
       <div class="sub" data-i18n>Storage temperature</div>
+      <div id="aiCard" class="aicard" hidden><b data-i18n>AI Predictor</b><span id="aiText"></span></div>
       <div class="row" id="doorRow"><span id="door">--</span><span class="m" id="age"></span></div>
       <div class="lamps" id="lamps">
         <button class="lamp" data-led="2" aria-pressed="false"><b></b><span class="lname"></span></button>
         <button class="lamp" data-led="3" aria-pressed="false"><b></b><span class="lname"></span></button>
       </div>
       <div class="row"><span id="awayLabel" data-i18n>Lock-up mode</span><button class="tg" id="away" role="switch" aria-checked="false" aria-labelledby="awayLabel"></button></div>
+      <button class="btn callbtn" id="callBtn"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span data-i18n>Call assistant</span></button>
+      <p class="note bad callnote" role="alert"></p>
+      <button class="row navrow" data-go="assistant"><span data-i18n>Assistant</span><span class="m">›</span></button>
+      <button class="row navrow" data-go="cooler"><span data-i18n>Cooler and door</span><span class="m">›</span></button>
       <button class="row navrow" id="guideLink" data-go="guide" hidden><span data-i18n>Board offline: reconnect guide</span><span class="m">›</span></button>
       <button class="row navrow" data-go="health"><span id="healthLine">Health</span><span class="m">›</span></button>
       <button class="row navrow" data-go="settings"><span data-i18n>Settings</span><span class="m">›</span></button>
@@ -54,6 +60,46 @@
         <img src="assets/vetc-logo.png" alt="" width="24" height="24">
         <span id="footVersions">Cold Storage Monitor</span><span class="m" data-i18n>About ›</span>
       </button>
+    </div>
+
+    <!-- Cooler and door (mini fridge) -->
+    <div id="viewCooler" hidden>
+      <div class="top"><button class="linkbtn" data-go="home" data-i18n>‹ Home</button><span data-i18n>Cooler and door</span></div>
+      <div class="row"><span data-i18n>Inside</span><span class="m"><b id="cIn">--</b> °C</span></div>
+      <div class="row"><span data-i18n>Hot side</span><span class="m"><b id="cHot">--</b> °C</span></div>
+      <div class="row"><span data-i18n>Peltier power</span><span class="m" id="cPel">--</span></div>
+      <div class="row"><span data-i18n>Fan</span><span class="m" id="cFan">--</span></div>
+      <div class="row"><span data-i18n>Door</span><span class="m" id="cDoor">--</span></div>
+      <p class="note" id="cStatus" role="status"></p>
+      <div class="row"><span id="coolOnLabel" data-i18n>Cooling</span><button class="tg" id="coolOn" role="switch" aria-checked="false" aria-labelledby="coolOnLabel"></button></div>
+      <div class="row"><label for="coolTarget" data-i18n>Target temperature</label><span class="m"><b id="coolTargetVal">12</b> °C</span></div>
+      <input id="coolTarget" class="field" type="range" min="5" max="20" step="0.5" value="12">
+      <div class="row"><button class="btn" id="doorOpen" data-i18n>Open door</button><button class="btn ghost" id="doorClose" data-i18n>Close door</button></div>
+      <p class="note" id="cLock" hidden data-i18n>Lock-up mode is on: the door will not open.</p>
+      <p class="note" data-i18n>Cooling stays off until you switch it on. The board stops the Peltier by itself if a sensor is missing, the hot side is too hot, or the box does not cool.</p>
+      <a class="btn ghost" href="sim.html" data-i18n>Open the 3D simulator</a>
+    </div>
+
+    <!-- Assistant -->
+    <div id="viewAssistant" hidden>
+      <div class="top"><button class="linkbtn" data-go="home" data-i18n>‹ Home</button><span data-i18n>Assistant</span></div>
+      <p class="note" data-i18n>Talk to the assistant like a phone call. It answers questions about the storage and switches the lights or lock-up mode after you confirm.</p>
+      <button class="btn callbtn" id="callBtn2"><span data-i18n>Call assistant</span></button>
+      <p class="note bad callnote" role="alert"></p>
+      <h5 data-i18n>Security</h5>
+      <div class="row"><span data-i18n>Fingerprint</span><span class="m" id="fpState">--</span></div>
+      <button class="btn ghost" id="fpSetup" data-i18n>Set up fingerprint</button>
+      <p class="note" id="fpNote"></p>
+      <h5 data-i18n>AI language model</h5>
+      <div class="row"><span id="aiMode">--</span></div>
+      <input id="aiCode" class="field" type="password" placeholder="Access code" data-i18n-attr="placeholder" autocomplete="off">
+      <button class="btn ghost" id="aiSave" data-i18n>Save access code</button>
+      <h5 data-i18n>Try it</h5>
+      <div id="chatLog" class="chatlog" aria-live="polite"></div>
+      <form id="chatForm" class="chatform"><input id="chatIn" class="field" placeholder="Type a message" data-i18n-attr="placeholder" autocomplete="off"><button class="btn" type="submit" data-i18n>Send</button></form>
+      <h5 data-i18n>Demo</h5>
+      <button class="btn ghost" id="demoBtn">Play demo: door left open</button>
+      <p class="note" data-i18n>The demo replays a simulated story of a door left open. It never touches the board.</p>
     </div>
 
     <!-- Health -->
@@ -149,6 +195,17 @@
       <button class="btn ghost" id="gBack" data-i18n>Back to the dashboard</button>
     </div>
   </section>
+
+  <!-- The call screen sits on top of everything while a call is going -->
+  <div id="call" class="call" role="dialog" aria-modal="true" aria-label="Assistant call" data-i18n-attr="aria-label" hidden>
+    <div class="callname" data-i18n>Cold storage assistant</div>
+    <div class="calltimer" id="callTimer">0:00</div>
+    <button class="avatar" id="avatar" aria-label="Interrupt" data-i18n-attr="aria-label"><i></i><i></i><svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11z"/></svg></button>
+    <div class="callstate" id="callState" role="status"></div>
+    <div class="calltext" id="callText" aria-live="polite"></div>
+    <form id="callForm" class="chatform"><input id="callIn" class="field" placeholder="Type a message" data-i18n-attr="placeholder" autocomplete="off"><button class="btn" type="submit" data-i18n>Send</button></form>
+    <button class="hangup" id="hangup"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 9c-3.2 0-6.2.8-8.6 2.2-.5.3-.7.8-.5 1.3l1 2.4c.2.5.8.8 1.3.6l3.1-1a1 1 0 0 0 .7-.9v-2c1-.3 2-.4 3-.4s2 .1 3 .4v2c0 .4.3.8.7.9l3.1 1c.5.2 1.1-.1 1.3-.6l1-2.4c.2-.5 0-1-.5-1.3A17.6 17.6 0 0 0 12 9z"/></svg><span data-i18n>Hang up</span></button>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"></script>

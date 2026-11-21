@@ -50,7 +50,7 @@ test('every Vietnamese entry is filled in and keeps the same {placeholders}', ()
 test('coverage: every text the page can show has a Vietnamese translation', () => {
   const keys = new Set();
   // t('...') calls in the scripts
-  for (const f of ['logic.js', 'app.js']) {
+  for (const f of ['logic.js', 'app.js', 'predictor.js', 'assistant.js']) {
     for (const m of read(f).matchAll(/\bt\(\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g)) keys.add(unquote(m[1]));
   }
   // texts passed as plain strings and drawn through t() later: download notes, self-test notes, button labels, lights

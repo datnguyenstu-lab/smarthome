@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini Fridge Simulator</title>
+<style>
+:root { --bg:#eef3f8; --panel:#ffffff; --ink:#12233a; --mute:#5a6b80; --line:#d3dde9; --accent:#0b5cad; --good:#1b7a3d; --warn:#b26a00; --bad:#b3261e; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0e1621; --panel:#16212f; --ink:#e6edf6; --mute:#9db0c6; --line:#2a3a4f; --accent:#5aa9ff; --good:#5fd08a; --warn:#f0b04a; --bad:#ff7b72; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 "Segoe UI", system-ui, sans-serif; }
+.wrap { align-items:start; display:grid; grid-template-columns:1fr 360px; gap:16px; padding:16px; min-height:100vh; }
+@media (max-width:900px) { .wrap { grid-template-columns:1fr; } .stage { position:relative; top:0; height:70vh; } }
+.stage { position:sticky; top:16px; height:calc(100vh - 32px); background:linear-gradient(#dfeaf5,#f4f8fc); border-radius:12px; overflow:hidden; min-height:420px; border:1px solid var(--line); }
+@media (prefers-color-scheme: dark) { .stage { background:linear-gradient(#1a2a3d,#0f1a27); } }
+#c3d { width:100%; height:100%; display:block; touch-action:none; cursor:grab; }
+.tags { position:absolute; inset:0; pointer-events:none; overflow:hidden; } .tag { position:absolute; left:0; top:0; white-space:nowrap; font-size:12px; font-weight:600; padding:2px 7px; border-radius:6px; background:var(--panel); color:var(--ink); border:1px solid var(--line); margin:-10px 0 0 10px; } .tag::before { content:""; position:absolute; left:-12px; top:50%; width:8px; height:8px; margin-top:-4px; border-radius:50%; background:var(--accent); }
+.hint { position:absolute; left:12px; bottom:10px; font-size:13px; color:var(--mute); }
+.side { display:flex; flex-direction:column; gap:12px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; }
+h1 { font-size:20px; margin:0 0 2px; }
+h2 { font-size:15px; margin:0 0 8px; }
+.sub { color:var(--mute); font-size:13px; margin:0; }
+.read { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; }
+.read div { display:flex; flex-direction:column; }
+.read b { font-size:24px; font-variant-numeric:tabular-nums; }
+.read span { color:var(--mute); font-size:13px; }
+.status { margin-top:10px; padding:8px 10px; border-radius:8px; background:var(--bg); font-weight:600; }
+.status.good { color:var(--good); } .status.warn { color:var(--warn); } .status.bad { color:var(--bad); }
+.row { display:flex; align-items:center; gap:10px; margin:8px 0; flex-wrap:wrap; }
+.row label { flex:1 1 120px; }
+input[type=range] { flex:2 1 140px; }
+button, select { font:inherit; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+canvas#chart { width:100%; height:150px; display:block; }
+#log { list-style:none; margin:0; padding:0; font-size:13px; color:var(--mute); max-height:130px; overflow:auto; }
+#log li { padding:2px 0; border-bottom:1px solid var(--line); }
+.asmtext { margin:4px 0 10px; font-size:14px; } .asmlist { margin:10px 0 0; padding:0; list-style:none; display:grid; gap:2px; } .asmlist button { width:100%; text-align:left; border:0; background:transparent; padding:4px 8px; border-radius:6px; font-size:13px; color:var(--mute); } .asmlist li.on button { background:var(--bg); color:var(--ink); font-weight:700; } .asmlist li.done button { color:var(--ink); }
+.foot { font-size:12px; color:var(--mute); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage"><canvas id="c3d" aria-label="3D model of the demo cold storage box"></canvas><div class="tags" id="tags"></div><div class="hint">Drag to rotate, scroll to zoom</div></div>
+  <div class="side">
+    <div class="card">
+      <h1>Mini fridge simulator</h1>
+      <p class="sub">Concept mini fridge: cold chamber + control bay, with the same control logic as the board's firmware.</p>
+    </div>
+    <div class="card">
+      <div class="read">
+        <div><b id="rIn">--</b><span>Inside °C</span></div>
+        <div><b id="rHot">--</b><span>Hot side °C</span></div>
+        <div><b id="rPel">0%</b><span>Peltier power</span></div>
+        <div><b id="rFan">0%</b><span>Fan</span></div>
+        <div><b id="rDoor">Closed</b><span>Door (IR sensor)</span></div>
+        <div><b id="rClock">0:00</b><span>Simulated time</span></div>
+      </div>
+      <div class="status" id="status">Cooling is off</div>
+    </div>
+    <div class="card">
+      <h2>Controls</h2>
+      <div class="row"><button id="bCool" class="primary" aria-pressed="false">Start cooling</button><button id="bReset">Reset</button></div>
+      <div class="row"><label for="target">Target <b id="tVal">12</b> °C</label><input id="target" type="range" min="5" max="20" step="0.5" value="12"></div>
+      <div class="row"><label for="amb">Room <b id="aVal">28</b> °C</label><input id="amb" type="range" min="20" max="40" step="1" value="28"></div>
+      <div class="row"><button id="bOpen">Open door</button><button id="bClose">Close door</button><button id="bScn">Open door 30 s</button></div>
+      <div class="row"><button id="bView">X-ray view</button><label><input id="labels" type="checkbox" checked> Labels</label></div>
+      <div class="row"><label><input id="lamp1" type="checkbox"> Light 1</label><label><input id="lamp2" type="checkbox"> Light 2</label></div>
+      <div class="row"><label><input id="lock" type="checkbox"> Lock-up mode (door will not open)</label></div>
+      <div class="row"><label><input id="block" type="checkbox"> Block the heatsink fan (fault test)</label></div>
+      <div class="row"><label for="speed">Speed</label>
+        <select id="speed"><option value="1">1×</option><option value="10">10×</option><option value="30" selected>30×</option><option value="60">60×</option></select></div>
+    </div>
+    <div class="card">
+      <h2>Assembly</h2>
+      <p class="sub" id="asmTitle"></p>
+      <p id="asmText" class="asmtext"></p>
+      <div class="row"><button id="asmStart">Start over</button><button id="asmPrev">Back</button><button id="asmPlay" class="primary">Play</button><button id="asmNext">Next</button><button id="asmAll">Show all</button></div>
+      <div class="row"><label for="explode">Exploded view</label><input id="explode" type="range" min="0" max="100" value="0"></div>
+      <ol id="asmList" class="asmlist"></ol>
+    </div>
+    <div class="card"><h2>Temperature, last 20 simulated minutes</h2><canvas id="chart" width="640" height="300"></canvas></div>
+    <div class="card"><h2>Events</h2><ul id="log"></ul></div>
+    <p class="foot">Simulation. The thermal numbers are estimates from typical datasheet values, not measurements of the real box.</p>
+  </div>
+</div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { Cooler, newState, stepThermal, CFG } from './cooler-sim.js';
+const $ = (id) => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+
+// ---------- simulation state ----------
+let ambient = 28, target = 12, coolOn = false, doorOpen = false, lockUp = false, fanBlocked = false;
+let simT = 0, cooler = new Cooler(), s = newState(ambient), out = { peltier: 0, fan: 0, reason: 'off' }, openedAt = 0, scnUntil = -1, lastReason = 'off';
+const hist = [];   // {t, inside, hot, target}
+const logEl = $('log');
+const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+function note(msg) { const li = document.createElement('li'); li.textContent = `${clock(simT)}  ${msg}`; logEl.prepend(li); while (logEl.children.length > 30) logEl.lastChild.remove(); }
+
+function setDoor(open, why) {
+  if (open && lockUp) { note('Door open refused: Lock-up mode is on'); return false; }
+  if (open === doorOpen) return true;
+  doorOpen = open; if (open) openedAt = simT;
+  note(open ? `Door opened (${why})` : `Door closed (${why})`);
+  return true;
+}
+
+function tick() {   // one simulated second
+  simT += 1;
+  if (doorOpen && simT - openedAt >= 60) setDoor(false, 'servo auto-close after 60 s');
+  if (scnUntil >= 0 && simT >= scnUntil) { scnUntil = -1; setDoor(false, 'scenario end'); }
+  stepThermal(s, out.peltier, out.fan, doorOpen, ambient, 1, fanBlocked);
+  if (simT % 10 === 0) {   // the board reads its sensors every 10 s
+    const prev = out.reason;
+    out = cooler.update(coolOn, target, s.inside, s.hot, simT * 1000);
+    if (out.reason !== prev) describeChange(out.reason);
+  }
+  if (simT % 5 === 0) { hist.push({ t: simT, inside: s.inside, hot: s.hot, target }); if (hist.length > 300) hist.shift(); }
+}
+const WHY = { none: 'Cooling running', off: 'Cooling is off', overheat: 'Cut-off: hot side too hot, Peltier off', no_cooling: 'Cut-off: no cooling for 10 minutes', inside_sensor: 'Cut-off: inside sensor missing', hot_sensor: 'Cut-off: hot-side sensor missing' };
+function describeChange(r) { if (r !== lastReason) { note(WHY[r]); lastReason = r; } }
+
+// ---------- UI ----------
+function refresh() {
+  $('rIn').textContent = s.inside.toFixed(1); $('rHot').textContent = s.hot.toFixed(0);
+  $('rPel').textContent = out.peltier + '%'; $('rFan').textContent = out.fan + '%';
+  $('rDoor').textContent = doorOpen ? 'Open' : 'Closed'; $('rClock').textContent = clock(simT);
+  const st = $('status'); st.textContent = WHY[out.reason];
+  const cut = ['overheat', 'no_cooling', 'inside_sensor', 'hot_sensor'].includes(out.reason);
+  st.className = 'status ' + (cut ? 'bad' : doorOpen && coolOn ? 'warn' : out.reason === 'none' ? 'good' : '');
+  if (out.reason === 'none' && out.peltier === 0) st.textContent = 'At target: Peltier resting';
+  if (doorOpen && coolOn && !cut) st.textContent = WHY[out.reason] + ' (door open: heat is coming in)';
+  $('bCool').textContent = coolOn ? 'Stop cooling' : 'Start cooling'; $('bCool').setAttribute('aria-pressed', String(coolOn));
+  drawChart();
+}
+function drawChart() {
+  const c = $('chart'), g = c.getContext('2d'), W = c.width, H = c.height, css = getComputedStyle(document.body);
+  g.clearRect(0, 0, W, H);
+  const t1 = Math.max(simT, 1200), t0 = t1 - 1200;
+  const lo = 0, hi = 70, X = (t) => ((t - t0) / 1200) * (W - 50) + 40, Y = (v) => H - 20 - ((v - lo) / (hi - lo)) * (H - 36);
+  g.font = '18px sans-serif'; g.fillStyle = css.getPropertyValue('--mute'); g.strokeStyle = css.getPropertyValue('--line'); g.lineWidth = 1;
+  for (const v of [0, 20, 40, 60]) { g.beginPath(); g.moveTo(40, Y(v)); g.lineTo(W - 10, Y(v)); g.stroke(); g.fillText(v, 4, Y(v) + 6); }
+  const line = (key, color, dash) => { g.beginPath(); g.setLineDash(dash || []); g.strokeStyle = color; g.lineWidth = 3; let first = true;
+    for (const p of hist) { if (p.t < t0) continue; const x = X(p.t), y = Y(p[key]); if (first) { g.moveTo(x, y); first = false; } else g.lineTo(x, y); } g.stroke(); g.setLineDash([]); };
+  line('hot', '#e08a50'); line('target', css.getPropertyValue('--mute'), [8, 6]); line('inside', css.getPropertyValue('--accent'));
+  g.fillStyle = css.getPropertyValue('--ink'); g.fillText('inside', W - 150, 22); g.fillStyle = '#e08a50'; g.fillText('hot side', W - 150, 44);
+}
+
+$('bCool').onclick = () => { coolOn = !coolOn; cooler.reset(); note(coolOn ? `Cooling started, target ${target} °C` : 'Cooling stopped'); };
+$('bReset').onclick = () => { simT = 0; cooler = new Cooler(); s = newState(ambient); out = { peltier: 0, fan: 0, reason: 'off' }; coolOn = false; doorOpen = false; scnUntil = -1; lastReason = 'off'; hist.length = 0; logEl.innerHTML = ''; note('Reset'); };
+$('target').oninput = (e) => { target = Number(e.target.value); $('tVal').textContent = target; cooler.reset(); };
+$('amb').oninput = (e) => { ambient = Number(e.target.value); $('aVal').textContent = ambient; };
+$('bOpen').onclick = () => setDoor(true, 'servo');
+$('bClose').onclick = () => setDoor(false, 'servo');
+$('bScn').onclick = () => { if (setDoor(true, 'scenario')) scnUntil = simT + 30; };
+$('lock').onchange = (e) => { lockUp = e.target.checked; note(lockUp ? 'Lock-up mode on' : 'Lock-up mode off'); };
+$('block').onchange = (e) => { fanBlocked = e.target.checked; note(fanBlocked ? 'Fan blocked (fault)' : 'Fan free'); };
+if (q.get('speed')) $('speed').value = q.get('speed');
+
+// ---------- 3D: one cabinet, two compartments (cold chamber + control bay), units = cm ----------
+const cv = $('c3d'), R = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+R.outputColorSpace = THREE.SRGBColorSpace; R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 0.85;
+R.shadowMap.enabled = true; R.shadowMap.type = THREE.PCFSoftShadowMap;
+const S = new THREE.Scene(), C = new THREE.PerspectiveCamera(30, 1, 1, 700);
+{ const pm = new THREE.PMREMGenerator(R); S.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose(); }
+S.add(new THREE.HemisphereLight(0xffffff, 0x8a97a8, 0.7));
+const sun = new THREE.DirectionalLight(0xfff6ea, 2.2); sun.position.set(55, 110, 70); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -80, right: 80, top: 80, bottom: -80, near: 20, far: 400 }); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.05; S.add(sun);
+const fill = new THREE.DirectionalLight(0xdbe8ff, 0.6); fill.position.set(-60, 40, 40); S.add(fill);
+
+// ---- procedural textures ----
+function canvasTex(w, h, draw, srgb = true) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const layerBump = canvasTex(8, 64, (g, w, h) => { for (let y = 0; y < h; y++) { const v = 128 + 70 * Math.sin((y / h) * Math.PI * 2 * 8); g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(0, y, w, 1); } }, false);
+layerBump.wrapS = layerBump.wrapT = THREE.RepeatWrapping; layerBump.repeat.set(1, 36);
+const foamTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#f0d27a'; g.fillRect(0, 0, w, h); for (let i = 0; i < 9000; i++) { const a = Math.random() * 0.25; g.fillStyle = Math.random() < 0.5 ? `rgba(255,240,170,${a})` : `rgba(190,150,60,${a})`; g.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 3, 2 + Math.random() * 3); } });
+foamTex.wrapS = foamTex.wrapT = THREE.RepeatWrapping; foamTex.repeat.set(4, 4);
+function canTex(base, name) {
+  return canvasTex(512, 256, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, base); gr.addColorStop(1, '#00000055'); g.fillStyle = base; g.fillRect(0, 0, w, h); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 70, w, 8); g.fillRect(0, 178, w, 8);
+    g.fillStyle = '#ffffff'; g.font = '700 74px Segoe UI, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(name, w / 4, h / 2); g.fillText(name, (w * 3) / 4, h / 2);
+  });
+}
+
+// ---- materials ----
+const printed = (color, rough = 0.42) => new THREE.MeshPhysicalMaterial({ color, roughness: rough, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.5, bumpMap: layerBump, bumpScale: 0.35 });
+const shellMat = printed(0xf3f4f6), darkMat = printed(0x2b323c, 0.5);
+const foamMat = new THREE.MeshStandardMaterial({ map: foamTex, roughness: 0.95 }), linerMat = new THREE.MeshPhysicalMaterial({ color: 0xe6eef5, roughness: 0.55, clearcoat: 0.2 });
+const metalMat = new THREE.MeshStandardMaterial({ color: 0xd3d9e0, metalness: 1, roughness: 0.3 });
+const screwMat = new THREE.MeshStandardMaterial({ color: 0xc4cad2, metalness: 1, roughness: 0.28 }), slotMat = new THREE.MeshStandardMaterial({ color: 0x14171b, roughness: 0.8 });
+const rubber = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.92 });
+const pcb = new THREE.MeshStandardMaterial({ color: 0x17703d, roughness: 0.55 }), pcbRed = new THREE.MeshStandardMaterial({ color: 0xa82424, roughness: 0.55 }), pcbBlue = new THREE.MeshStandardMaterial({ color: 0x1f56a8, roughness: 0.55 }), black = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.6 });
+const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xeef8ff, roughness: 0.04, metalness: 0, transmission: 1, thickness: 0.5, ior: 1.45, transparent: true, side: THREE.DoubleSide });
+const glass2 = new THREE.MeshPhysicalMaterial({ color: 0xcfe6f5, roughness: 0.05, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+const xray = [shellMat, darkMat];
+
+// ---- assembly steps: every part is registered with the step that is current when it is created ----
+const STEPS = [], seen = new Set(); let cur = null;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function step(title, text, dir, dist) { cur = { title, text, items: [], dir: V(...dir).normalize().multiplyScalar(dist), p: 1 }; STEPS.push(cur); }
+function reg(o) { if (!o || seen.has(o)) return; seen.add(o); cur.items.push({ o, base: o.position.clone(), dir: null }); }
+function setDir(o, v) { const it = cur.items.find((i) => i.o === o); if (it) it.dir = v; }
+function put(m, x, y, z, parent = S) { m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); reg(parent === S ? m : parent); return m; }
+function box(w, h, d, m, x, y, z, parent) { return put(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m), x, y, z, parent); }
+function rbox(w, h, d, r, m, x, y, z, parent) { return put(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001)), m), x, y, z, parent); }
+function slab(w, h, d, holes, m, x, y, z, parent, bevel = 0.2) {   // slab in the xy plane with rectangular or round holes
+  const sh = new THREE.Shape(); sh.moveTo(-w / 2, -h / 2); sh.lineTo(w / 2, -h / 2); sh.lineTo(w / 2, h / 2); sh.lineTo(-w / 2, h / 2); sh.lineTo(-w / 2, -h / 2);
+  for (const o of holes) { const p = new THREE.Path(); if (o.r) p.absarc(o.x || 0, o.y || 0, o.r, 0, Math.PI * 2, true); else { const cx = o.x || 0, cy = o.y || 0; p.moveTo(cx - o.w / 2, cy - o.h / 2); p.lineTo(cx - o.w / 2, cy + o.h / 2); p.lineTo(cx + o.w / 2, cy + o.h / 2); p.lineTo(cx + o.w / 2, cy - o.h / 2); p.lineTo(cx - o.w / 2, cy - o.h / 2); } sh.holes.push(p); }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.01, d - 2 * bevel), bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 32 }); g.translate(0, 0, -(d - 2 * bevel) / 2);
+  return put(new THREE.Mesh(g, m), x, y, z, parent);
+}
+function cyl(r, h, m, x, y, z, parent, seg = 32) { return put(new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m), x, y, z, parent); }
+function label(text, w, h, bg, fg, size) {
+  const t = canvasTex(512, Math.round(512 * h / w), (g, W, H) => { g.fillStyle = bg; g.fillRect(0, 0, W, H); g.fillStyle = fg; g.font = `600 ${size}px Segoe UI, Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    text.split('\n').forEach((l, i, a) => g.fillText(l, W / 2, H / 2 + (i - (a.length - 1) / 2) * size * 1.15)); });
+  return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t }));
+}
+// A wall = printed outer tray, foam core, inner liner (3 cm in total). n = outward direction along `axis`.
+function sandwich(cx, cy, cz, w, h, d, axis, n) {
+  const ai = { x: 0, y: 1, z: 2 }[axis], T = 3, SK = 0.3, off = T / 2 - SK / 2, parts = [];
+  const make = (thick, offset, m, round) => {
+    const s = [w, h, d]; s[ai] = thick; const c = [cx, cy, cz]; c[ai] += n * offset;
+    const o = round ? rbox(s[0], s[1], s[2], 0.14, m, c[0], c[1], c[2]) : box(s[0], s[1], s[2], m, c[0], c[1], c[2]);
+    parts.push(o); return o;
+  };
+  make(SK, off, shellMat, true); make(T - 2 * SK - 0.2, 0, foamMat, false); make(SK, -off, linerMat, true);
+  const inward = [0, 0, 0]; inward[ai] = -n;
+  setDir(parts[1], V(...inward).multiplyScalar(30)); setDir(parts[2], V(...inward).multiplyScalar(48));
+}
+// a screw: group origin on the surface, `nrm` = outward axis ('+x','-x','+y','+z','-z')
+const headGeo = new THREE.CylinderGeometry(0.34, 0.38, 0.14, 20), slotGeo = new THREE.BoxGeometry(0.5, 0.04, 0.09);
+function screw(x, y, z, nrm, mat = screwMat) {
+  const g = new THREE.Group(); g.position.set(x, y, z);
+  if (nrm === '+z') g.rotation.x = Math.PI / 2; else if (nrm === '-z') g.rotation.x = -Math.PI / 2; else if (nrm === '+x') g.rotation.z = -Math.PI / 2; else if (nrm === '-x') g.rotation.z = Math.PI / 2;
+  S.add(g); const h = new THREE.Mesh(headGeo, mat); h.position.y = 0.07; h.castShadow = true; g.add(h);
+  const a = new THREE.Mesh(slotGeo, slotMat); a.position.y = 0.142; g.add(a); const b = new THREE.Mesh(slotGeo, slotMat); b.position.y = 0.142; b.rotation.y = Math.PI / 2; g.add(b);
+  reg(g); return g;
+}
+const screwRow = (a, b, pitch, fn) => { const L = Math.abs(b - a), n = Math.max(2, Math.round(L / pitch) + 1); for (let i = 0; i < n; i++) fn(a + ((b - a) * i) / (n - 1)); };
+
+// ground: soft grey disc plus a contact shadow
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), new THREE.ShadowMaterial({ opacity: 0.28 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; S.add(floor);
+{ const tex = canvasTex(256, 256, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,0.38)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(95, 70), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(0, 0.02, 0); S.add(m); }
+
+// 1 base and feet
+step('Base plate and feet', 'Print the base in PETG and press in the four rubber feet. Everything else stands on this plate.', [0, 1, 0], 40);
+rbox(36, 2, 24, 0.4, darkMat, 0, 2, 0);
+[[-15, -9], [15, -9], [-15, 9], [15, 9]].forEach(([x, z]) => { cyl(1.2, 0.9, rubber, x, 0.45, z); cyl(1.0, 0.12, black, x, 0.94, z); });
+
+// 2..6 cold chamber walls: x -18..8, y 3..24, floor and ceiling z -12..8, walls between them
+step('Chamber floor', 'Each wall is a sandwich. The printed outer tray goes first, the 25 mm XPS foam drops in, then the inner liner is glued on and its edges sealed with silicone.', [0, 1, 0], 42);
+sandwich(-5, 4.5, -2, 26, 3, 20, 'y', -1);
+step('Back wall', 'Same sandwich: tray, foam, liner. It stands on the floor. Seal the inside seam with silicone, because moisture in the foam would ruin the insulation.', [0, 0, -1], 42);
+sandwich(-5, 13.5, -10.5, 26, 15, 3, 'z', -1);
+step('Left wall', 'The outer tray and the inner liner never touch each other, so there is no heat bridge through the wall.', [-1, 0, 0], 42);
+sandwich(-16.5, 13.5, -0.5, 3, 15, 17, 'x', -1);
+step('Divider wall', 'The divider keeps the dry control bay apart from the cold chamber.', [1, 0, 0], 42);
+sandwich(6.5, 13.5, -0.5, 3, 15, 17, 'x', 1);
+step('Ceiling', 'The last wall. Leave the 40 mm opening for the aluminium block of the Peltier.', [0, 1, 0], 42);
+sandwich(-5, 22.5, -2, 26, 3, 20, 'y', 1);
+
+// 7 four tie rods clamp the stack: they run from the base up through the corners of floor, wall and ceiling
+step('Tie rods', 'Four stainless M4 rods run up through the corners of the stack, inside the walls. Tightening the nuts under the hood clamps the walls between floor and ceiling and squeezes a strip of closed-cell foam tape at every joint: that is the seal. Printed tubes carry the load, so the foam is not crushed.', [0, 1, 0], 44);
+const rodMat = new THREE.MeshStandardMaterial({ color: 0xcfd5dc, metalness: 1, roughness: 0.3 });
+[[-16.5, -10.5], [6.5, -10.5], [-16.5, 7], [6.5, 7]].forEach(([x, z]) => {
+  cyl(0.2, 23, rodMat, x, 14.2, z); cyl(0.65, 0.12, rodMat, x, 24.1, z); const n = cyl(0.55, 0.4, rodMat, x, 24.4, z, S, 6);
+});
+
+// 8 seal the outside seams with a dark silicone line
+step('Seal the seams', 'Each outside seam is a 1.5 mm gap between two panels. A thin bead of dark food-safe silicone fills it, which keeps water out and gives the cabinet its panel lines. The upright seams also have a 5 mm tongue-and-groove key.', [0, 0, -1], 14);
+for (const y of [6, 21]) { box(26, 0.3, 0.1, slotMat, -5, y, -12.04); box(0.1, 0.3, 20, slotMat, -18.04, y, -2); }
+box(0.1, 15, 0.3, slotMat, -18.04, 13.5, -9);
+
+// 8 front frame, gasket and magnets
+step('Front frame and gasket', 'A printed frame (30 mm wide bars) ties the four front edges together. The black EPDM gasket goes on its face and three magnets sit in pockets on the free side.', [0, 0, 1], 34);
+slab(26, 21, 1, [{ w: 20, h: 15 }], darkMat, -5, 13.5, 8.5, S, 0.15);
+slab(22, 17, 0.5, [{ w: 20, h: 15 }], rubber, -5, 13.5, 9.1, S, 0.1);
+[8.5, 13.5, 18.5].forEach((y) => cyl(0.55, 0.3, metalMat, -16.8, y, 9.15, S).rotation.x = Math.PI / 2);
+screwRow(-17, 7, 7, (x) => { screw(x, 3.8, 9.0, '+z'); screw(x, 23.2, 9.0, '+z'); });
+screwRow(5, 22, 6, (y) => { screw(-17, y, 9.0, '+z'); });
+
+// 9 Peltier stack through the ceiling
+step('Peltier stack', 'The aluminium block runs through the ceiling: cold plate inside, the Peltier on top, then the hot heatsink. Four nylon clamp screws with spring washers hold the stack; thermal paste on every joint.', [0, 1, 0], 36);
+const coldMat = new THREE.MeshStandardMaterial({ color: 0xcfe6f5, metalness: 1, roughness: 0.32, emissive: 0x0066cc, emissiveIntensity: 0 });
+box(8, 0.6, 8, coldMat, -5, 20.7, -2); for (let i = 0; i < 7; i++) box(0.22, 1.8, 7.6, coldMat, -8.2 + i * 1.07, 19.5, -2);
+box(4, 0.5, 4, new THREE.MeshStandardMaterial({ color: 0xefeee6, roughness: 0.5 }), -5, 21.25, -2); box(4, 0.1, 4, new THREE.MeshStandardMaterial({ color: 0x3b6fb0, roughness: 0.4 }), -5, 21.0, -2);
+box(4, 2.2, 4, metalMat, -5, 22.65, -2);
+const hotMat = new THREE.MeshStandardMaterial({ color: 0xd9dee5, metalness: 1, roughness: 0.34, emissive: 0xff3300, emissiveIntensity: 0 });
+box(8, 0.8, 8, hotMat, -5, 24.4, -2); for (let i = 0; i < 10; i++) box(0.2, 3.8, 7.6, hotMat, -8.4 + i * 1.87 * 0.6 + 0.0, 26.7, -2);
+const nylon = new THREE.MeshStandardMaterial({ color: 0xf1ede2, roughness: 0.6 });
+[[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { cyl(0.16, 5.4, nylon, -5 + sx * 3.4, 22.6, -2 + sz * 3.4); cyl(0.38, 0.25, nylon, -5 + sx * 3.4, 25.0, -2 + sz * 3.4); });
+
+// 10 things inside the chamber
+step('Inside the chamber', 'Shelf with two rails, six cans, the DS18B20 probe, the IR door sensor and the two storage lights.', [0, 0, 1], 40);
+box(19.6, 0.2, 17.6, new THREE.MeshPhysicalMaterial({ color: 0xdfe6ee, transparent: true, opacity: 0.55, roughness: 0.2 }), -5, 6.1, 0);
+[-8.4, 8.4].forEach((z) => box(19.6, 0.4, 0.6, linerMat, -5, 6.2, z));
+const canCols = ['#d9322b', '#2b7fd9', '#d9322b', '#2b7fd9', '#d9322b', '#2b7fd9'];
+for (let i = 0; i < 6; i++) {
+  const x = -11.7 + (i % 3) * 6.6, z = i < 3 ? -3.6 : 3.6;
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 11.4, 48, 1), new THREE.MeshPhysicalMaterial({ map: canTex(canCols[i], i % 2 ? 'SODA' : 'COLA'), metalness: 0.75, roughness: 0.3, clearcoat: 0.4 }));
+  put(body, x, 12.0, z); put(new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.3, 0.5, 48), metalMat), x, 17.95, z); put(new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.8, 0.2, 48), metalMat), x, 18.25, z);
+  const rim = put(new THREE.Mesh(new THREE.TorusGeometry(2.8, 0.14, 8, 40), metalMat), x, 18.3, z); rim.rotation.x = Math.PI / 2;
+  box(1.2, 0.08, 0.7, metalMat, x + 0.3, 18.38, z);
+}
+box(0.25, 5.4, 0.25, black, -5, 18.3, -8); cyl(0.45, 2.2, metalMat, -5, 15.5, -8);
+{ const g = new THREE.Group(); g.position.set(4.9, 16, 7.6); S.add(g); box(0.4, 1.2, 2.4, pcbBlue, 0, 0, 0, g); box(0.5, 0.6, 0.6, black, -0.3, 0.2, 0.7, g); box(0.5, 0.6, 0.6, black, -0.3, 0.2, -0.7, g); }
+const lamps = [-10.5, -0.5].map((x) => { const m = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff0cc, emissiveIntensity: 0 }); box(7, 0.4, 0.9, m, x, 20.8, 6.5); const pl = new THREE.PointLight(0xfff0cc, 0, 40, 2); pl.position.set(x, 19.5, 5.5); S.add(pl); return { m, pl }; });
+
+// 11 electronics, servo and wiring of the control bay
+const BX = 13.4;
+step('Electronics', 'ESP8266, two MOSFET modules, buck converter and terminal block on the bay back plate, then the servo and the leads to the Peltier, fan and probe.', [1, 0, 0], 38);
+{ const g = new THREE.Group(); g.position.set(BX, 0, -11); S.add(g);
+  box(8.6, 24, 0.4, new THREE.MeshStandardMaterial({ color: 0xdfe3e8, roughness: 0.6 }), 0, 17, 0, g);
+  box(3.4, 6, 0.3, pcb, 0, 24, 0.5, g); box(2.4, 2.6, 0.4, black, 0, 25.5, 0.8, g); box(1.2, 0.9, 0.6, metalMat, 0, 21.4, 0.8, g);
+  [-2.2, 2.2].forEach((x) => { box(2.8, 4.4, 0.3, pcbRed, x, 15.5, 0.5, g); box(2.2, 2.2, 1.6, metalMat, x, 16.5, 1.4, g); });
+  box(4.2, 2.2, 0.3, pcbBlue, 0, 10.5, 0.5, g); cyl(0.6, 1.4, metalMat, -1.2, 10.5, 1.3, g).rotation.x = Math.PI / 2;
+  box(5.6, 1.6, 1.2, new THREE.MeshStandardMaterial({ color: 0x2c6e49, roughness: 0.6 }), 0, 6.8, 0.8, g); for (let i = 0; i < 4; i++) cyl(0.35, 1.4, metalMat, -2 + i * 1.3, 6.8, 1.5, g, 12).rotation.x = Math.PI / 2;
+}
+const servo = new THREE.Group(); servo.position.set(11.8, 9.5, 7); S.add(servo);
+box(4, 2.2, 1.2, new THREE.MeshStandardMaterial({ color: 0x1f4e99, roughness: 0.5 }), 0, 0, 0, servo); box(1.2, 2.2, 0.4, new THREE.MeshStandardMaterial({ color: 0x1f4e99, roughness: 0.5 }), 2.4, 0, 0, servo); cyl(0.5, 0.8, metalMat, -1.7, 0, 0.9, servo);
+const horn = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.35, 0.5), metalMat); horn.position.set(-1.7, 0, 1.4); servo.add(horn);
+const wire = (pts, color) => { const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p))); const m = new THREE.Mesh(new THREE.TubeGeometry(c, 40, 0.14, 8), new THREE.MeshStandardMaterial({ color, roughness: 0.7 })); S.add(m); reg(m); };
+wire([[11, 17, -9.5], [11, 26, -9.5], [3, 27, -9], [-3, 22, -3.5]], 0xe08a30);
+wire([[15, 17, -9.5], [15, 28, -9.5], [3, 29, -9.5], [-2, 29.5, -3]], 0xd33a3a);
+wire([[13, 24, -9.5], [8, 25, -9.6], [-3, 22.2, -9.6], [-5, 20.5, -8]], 0x333333);
+
+// 12 control bay shell (6 mm gap to the divider leaves room for the door hinge) with its 6 standoffs
+step('Control bay shell', 'The printed bay shell slides over the electronics and bolts to the divider through six standoffs. The 8 mm gap is the room for the hinge and the servo rod.', [1, 0, 0], 46);
+rbox(9.2, 28, 24, 0.5, shellMat, BX, 17, 0);
+[[8, -6], [8, 4], [14, -6], [14, 4], [20, -6], [20, 4]].forEach(([y, z]) => { const s = cyl(0.7, 0.8, black, 8.4, y, z, S); s.rotation.z = Math.PI / 2; });
+
+// 13 front panel
+step('Front panel', 'Display, four status LEDs, two light buttons, the label plate, and the 12 V DC jack with the power switch on the side.', [0, 0, 1], 30);
+const oled = document.createElement('canvas'); oled.width = 256; oled.height = 128; const og = oled.getContext('2d');
+const oledTex = new THREE.CanvasTexture(oled); oledTex.colorSpace = THREE.SRGBColorSpace;
+rbox(8.2, 5.6, 0.6, 0.2, black, BX, 25, 12.2);
+const oledMesh = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 4.0), new THREE.MeshBasicMaterial({ map: oledTex })); oledMesh.position.set(BX, 25, 12.52); S.add(oledMesh); reg(oledMesh);
+const ledMats = ['#2ecc71', '#3da0ff', '#ffd23d', '#ff4d3d'].map((c, i) => { const m = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: new THREE.Color(c), emissiveIntensity: 0, roughness: 0.3 }); put(new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), m), BX - 2.85 + i * 1.9, 20.6, 12.2); return m; });
+const lbl = label('POWER   WI-FI   STATUS   ALERT', 8, 0.7, '#f3f4f6', '#4a5568', 34); lbl.position.set(BX, 19.5, 12.02); S.add(lbl); reg(lbl);
+[BX - 2, BX + 2].forEach((x) => { const b = cyl(1.2, 0.5, new THREE.MeshStandardMaterial({ color: 0x39414d, roughness: 0.35 }), x, 16, 12.2); b.rotation.x = Math.PI / 2; });
+const lbl2 = label('LIGHT 1        LIGHT 2', 8, 0.7, '#f3f4f6', '#4a5568', 34); lbl2.position.set(BX, 14.3, 12.02); S.add(lbl2); reg(lbl2);
+const plate = label('COLD STORAGE MONITOR\nmini fridge', 8, 2.2, '#f3f4f6', '#12233a', 40); plate.position.set(BX, 8.5, 12.02); S.add(plate); reg(plate);
+{ const j = cyl(1.0, 1.2, black, 18.1, 10, 4); j.rotation.z = Math.PI / 2; const j2 = cyl(0.35, 1.3, metalMat, 18.2, 10, 4); j2.rotation.z = Math.PI / 2;
+  box(0.5, 2.4, 1.4, new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.5 }), 18.15, 10, -3); box(0.6, 1.1, 1.2, new THREE.MeshStandardMaterial({ color: 0xdd3333, roughness: 0.4 }), 18.3, 10.6, -3);
+  const sl = label('12 V DC      POWER', 8, 0.8, '#f3f4f6', '#4a5568', 38); sl.rotation.y = Math.PI / 2; sl.position.set(18.07, 7.6, 0); S.add(sl); reg(sl); }
+for (let i = 0; i < 6; i++) box(5, 0.18, 0.5, black, BX, 4.6 + i * 0.5, 12.04);   // vent slots in the bay's lower front
+
+// 14 door: sandwich tray with a double-pane window, hinged at x = 8.2 next to the bay, pushed by the servo
+step('Door', 'The door is a sandwich too. It has a double-pane window, a handle, and two hinge knuckles that meet the frame knuckle on a removable steel pin. The servo rod connects to the tab beside the hinge.', [0, 0, 1], 46);
+const hinge = new THREE.Group(); hinge.position.set(8.2, 0, 10.8); S.add(hinge);
+slab(26, 21, 3, [{ w: 19, h: 13.5 }], shellMat, -13.2, 13.5, 0, hinge, 0.25);
+{ const gl = new THREE.Mesh(new THREE.PlaneGeometry(19.4, 13.9), glassMat); gl.position.set(-13.2, 13.5, 0.55); hinge.add(gl); const g2 = new THREE.Mesh(new THREE.PlaneGeometry(19.4, 13.9), glass2); g2.position.set(-13.2, 13.5, -0.55); hinge.add(g2); }
+rbox(1, 9, 1.4, 0.3, darkMat, -24.6, 13.5, 2, hinge);
+[8.5, 18.5].forEach((y) => { const k = cyl(0.55, 4.2, metalMat, 0, y - 1.5 + 1.5, 0, hinge); box(1.4, 3.6, 0.5, darkMat, -0.9, y, 0.0, hinge); });
+const tab = box(0.5, 0.5, 1.8, metalMat, 0.4, 8, -0.9, hinge);
+const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 8), metalMat); rod.castShadow = true; S.add(rod);
+// frame-side knuckle and pin (fixed)
+cyl(0.55, 4.2, metalMat, 8.2, 13.5, 10.8, S); box(0.6, 3.8, 1.8, darkMat, 8.25, 13.5, 9.9, S);
+cyl(0.16, 16.6, black, 8.2, 13.5, 10.8, S); cyl(0.4, 0.3, black, 8.2, 22.0, 10.8, S);
+
+// 15 hood (hot side): x -18..8, y 24..31, z -12..12
+step('Hood and fan', 'ASA or PETG hood with angled louvres, the 80 mm fan in its frame and the second temperature probe. Leave 10 mm around the hot heatsink and 50 mm of free air around the fridge.', [0, 1, 0], 46);
+rbox(1, 7, 24, 0.2, darkMat, -17.5, 27.5, 0); rbox(1, 7, 24, 0.2, darkMat, 7.5, 27.5, 0);
+for (let i = 0; i < 6; i++) for (const z of [11.75, -11.75]) { const l = box(24, 0.15, 0.9, darkMat, -5, 25.4 + i * 1.1, z); l.rotation.x = z > 0 ? 0.55 : -0.55; }
+box(24, 0.7, 0.5, darkMat, -5, 24.5, 11.9); box(24, 0.7, 0.5, darkMat, -5, 24.5, -11.9);
+screwRow(-15.5, 5.5, 8, (x) => { screw(x, 24.5, 12.15, '+z'); screw(x, 24.5, -12.15, '-z'); });
+{ const top = slab(26, 24, 0.8, [{ r: 4.2, x: 0, y: 2 }], darkMat, -5, 30.6, 0, S, 0.2); top.rotation.x = -Math.PI / 2;
+  [1.6, 2.9, 4.0].forEach((r) => { const t = put(new THREE.Mesh(new THREE.TorusGeometry(r, 0.12, 8, 48), black), -5, 31.5, -2); t.rotation.x = Math.PI / 2; });
+  for (let k = 0; k < 8; k++) { const s = box(8.2, 0.12, 0.14, black, -5, 31.5, -2); s.rotation.y = (k * Math.PI) / 8; } }
+const fan = new THREE.Group(); fan.position.set(-5, 29.3, -2); S.add(fan);
+{ const fr = slab(8, 8, 2.4, [{ r: 3.7 }], black, -5, 29.3, -2, S, 0.25); fr.rotation.x = Math.PI / 2;
+  cyl(1.2, 0.9, black, 0, 0, 0, fan);
+  const bs = new THREE.Shape(); bs.moveTo(0.8, 0); bs.quadraticCurveTo(2.2, -1.5, 3.5, -1.0); bs.quadraticCurveTo(3.9, 0.4, 3.0, 1.0); bs.quadraticCurveTo(1.6, 1.0, 0.8, 0.4);
+  const bg = new THREE.ExtrudeGeometry(bs, { depth: 0.1, bevelEnabled: false }); bg.rotateX(-Math.PI / 2);
+  for (let k = 0; k < 7; k++) { const bl = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ color: 0x3a4250, roughness: 0.5 })); bl.castShadow = true; const gp = new THREE.Group(); bl.rotation.x = 0.0; bl.rotation.z = 0.4; gp.add(bl); gp.rotation.y = (k * Math.PI * 2) / 7; fan.add(gp); } }
+[[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => screw(-5 + sx * 3.4, 30.7 + 0.8, -2 + sz * 3.4, '+y'));
+box(0.7, 0.7, 0.7, metalMat, -2, 25.3, -5.8);
+{ const gr = put(new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.16, 8, 20), rubber), 10, 31, -3); gr.rotation.x = Math.PI / 2; }
+
+// ---------- assembly player ----------
+const ease = (x) => 1 - Math.pow(1 - x, 3);
+let asmStep = STEPS.length - 1, explode = 0, playTimer = null;
+const asmList = $('asmList');
+STEPS.forEach((st, i) => { const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.textContent = st.title; b.onclick = () => goStep(i); li.appendChild(b); asmList.appendChild(li); });
+function goStep(k) {
+  asmStep = Math.max(0, Math.min(STEPS.length - 1, k));
+  [...asmList.children].forEach((li, i) => { li.classList.toggle('on', i === asmStep); li.classList.toggle('done', i < asmStep); li.firstChild.setAttribute('aria-current', i === asmStep ? 'step' : 'false'); });
+  $('asmTitle').textContent = `Step ${asmStep + 1} of ${STEPS.length}: ${STEPS[asmStep].title}`; $('asmText').textContent = STEPS[asmStep].text;
+}
+function stopPlay() { if (playTimer) { clearInterval(playTimer); playTimer = null; } $('asmPlay').textContent = 'Play'; }
+$('asmPrev').onclick = () => { stopPlay(); goStep(asmStep - 1); };
+$('asmNext').onclick = () => { stopPlay(); goStep(asmStep + 1); };
+$('asmStart').onclick = () => { stopPlay(); goStep(0); };
+$('asmAll').onclick = () => { stopPlay(); goStep(STEPS.length - 1); };
+$('asmPlay').onclick = () => { if (playTimer) return stopPlay(); if (asmStep >= STEPS.length - 1) goStep(0);
+  $('asmPlay').textContent = 'Pause'; playTimer = setInterval(() => { if (asmStep >= STEPS.length - 1) stopPlay(); else goStep(asmStep + 1); }, 2800); };
+$('explode').oninput = (e) => { explode = Number(e.target.value) / 100; };
+goStep(STEPS.length - 1);
+const assembled = () => asmStep === STEPS.length - 1 && STEPS.every((s) => s.p > 0.999) && explode === 0;
+function applyAssembly(dt) {
+  STEPS.forEach((st, i) => {
+    const tgt = i <= asmStep ? 1 : 0; st.p += Math.sign(tgt - st.p) * Math.min(Math.abs(tgt - st.p), dt / 0.9);
+    st.items.forEach((it, j) => {
+      const delay = Math.min(0.55, j * 0.04), lp = Math.max(0, Math.min(1, (st.p - delay) / (1 - delay)));
+      const f = Math.max(1 - ease(lp), explode), d = it.dir || st.dir;
+      it.o.position.copy(it.base).addScaledVector(d, f); it.o.visible = lp > 0.001 || explode > 0;
+    });
+  });
+}
+window.__asm = { steps: STEPS.length, step: () => asmStep, visible: () => { let n = 0; for (const st of STEPS) for (const it of st.items) if (it.o.visible) n++; return n; }, total: STEPS.reduce((a, s) => a + s.items.length, 0) };
+
+// ---------- view controls ----------
+let xrayOn = false;
+function setXray(on) {
+  xrayOn = on;
+  for (const m of xray) { m.transparent = on; m.opacity = on ? 0.12 : 1; m.depthWrite = !on; m.needsUpdate = true; }
+  foamMat.transparent = on; foamMat.opacity = on ? 0.35 : 1; foamMat.needsUpdate = true;
+}
+$('bView').onclick = () => { setXray(!xrayOn); $('bView').textContent = xrayOn ? 'Product view' : 'X-ray view'; };
+$('lamp1').onchange = (e) => note(`Light 1 ${e.target.checked ? 'on' : 'off'}`);
+$('lamp2').onchange = (e) => note(`Light 2 ${e.target.checked ? 'on' : 'off'}`);
+
+// labels (the "inner" ones only show in X-ray view)
+const TAGS = [['Cold chamber, holds 6 cans', -5, 11, 0, 0], ['Glass-window door', -9, 6, 13, 0], ['Peltier + cold heatsink', -5, 20, -2, 1], ['Hot heatsink + 80 mm fan', -5, 28, -2, 0],
+  ['Display + status LEDs', BX, 25, 12.8, 0], ['ESP8266 + MOSFET drivers', BX, 17, -9, 1], ['Servo + linkage', 11.8, 10, 8, 1], ['Storage lights', -10, 20.8, 6.5, 0],
+  ['DS18B20 inside probe', -5, 15.5, -8, 0], ['IR door sensor', 4.9, 16, 7.6, 0], ['12 V DC in + switch', 18.5, 10, 0, 0], ['Sealed seam (silicone)', -12, 6, -12.2, 0], ['Tie rod + nut', -16.5, 24.4, -10.5, 1],
+  ['Front frame + gasket', -17, 22, 9.4, 0], ['Door hinge + pin', 8.4, 20, 11, 0], ['Control bay (dry side)', BX, 30, 0, 0]];
+const tagEls = TAGS.map(([t, x, y, z, inner]) => { const d = document.createElement('div'); d.className = 'tag'; d.textContent = t; $('tags').appendChild(d); return { d, v: new THREE.Vector3(x, y, z), inner }; });
+
+// camera, drag, zoom
+let az = 0.55, el = 0.3, dist = 100, drag = null;
+cv.addEventListener('pointerdown', (e) => { drag = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+cv.addEventListener('pointerup', () => { drag = null; cv.style.cursor = 'grab'; });
+cv.addEventListener('pointermove', (e) => { if (!drag) return; az -= (e.clientX - drag[0]) * 0.008; el = Math.min(1.3, Math.max(0.02, el + (e.clientY - drag[1]) * 0.006)); drag = [e.clientX, e.clientY]; });
+cv.addEventListener('wheel', (e) => { e.preventDefault(); dist = Math.min(280, Math.max(35, dist + e.deltaY * 0.05)); }, { passive: false });
+function size() { const r = cv.parentElement.getBoundingClientRect(), h = Math.max(r.height, 420); R.setPixelRatio(Math.min(2, devicePixelRatio || 1)); R.setSize(r.width, h, false); C.aspect = r.width / h; C.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+
+function drawOled() {
+  og.fillStyle = '#041018'; og.fillRect(0, 0, 256, 128);
+  og.fillStyle = '#7fe0ff'; og.font = '700 54px Segoe UI, Arial'; og.textBaseline = 'alphabetic'; og.fillText(s.inside.toFixed(1) + '°C', 12, 62);
+  og.font = '600 22px Segoe UI, Arial'; og.fillStyle = '#9fb7c9';
+  og.fillText('target ' + target.toFixed(1) + '°  ' + (coolOn ? 'COOL' : 'OFF'), 12, 92);
+  og.fillStyle = doorOpen ? '#ffb347' : '#9fb7c9'; og.fillText(doorOpen ? 'DOOR OPEN' : 'door closed', 12, 118);
+  og.fillStyle = '#9fb7c9'; og.fillText('P' + out.peltier + '%', 176, 118);
+  oledTex.needsUpdate = true;
+}
+
+// ---------- loop ----------
+let last = performance.now(), acc = 0, oledAt = 0;
+if (q.get('auto')) { coolOn = true; note(`Cooling started, target ${target} °C`); }
+const tmpV = new THREE.Vector3(), tabW = new THREE.Vector3(), hornW = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+function loop(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  acc += dt * Number($('speed').value);
+  let n = 0; while (acc >= 1 && n < 400) { tick(); acc -= 1; n++; }
+  applyAssembly(dt);
+  hotMat.emissiveIntensity = Math.min(1, Math.max(0, (s.hot - 30) / 35)) * 0.9; coldMat.emissiveIntensity = (out.peltier / 100) * 0.7;
+  fan.rotation.y += (out.fan / 100) * 0.55 * (fanBlocked ? 0 : 1);
+  hinge.rotation.y += ((doorOpen ? 1.15 : 0) - hinge.rotation.y) * 0.12;
+  lamps.forEach((l, i) => { const on = $(i ? 'lamp2' : 'lamp1').checked; l.m.emissiveIntensity = on ? 1.4 : 0; l.pl.intensity = on ? 220 : 0; });
+  const alarm = ['overheat', 'no_cooling', 'inside_sensor', 'hot_sensor'].includes(out.reason) || (doorOpen && Math.floor(simT) % 2 === 0);
+  ledMats.forEach((m, i) => { m.emissiveIntensity = [1.4, coolOn ? 1.4 : 0.1, coolOn ? 1.2 : 0, alarm ? 1.6 : 0][i]; });
+  hinge.updateMatrixWorld(true); tab.getWorldPosition(tabW); horn.getWorldPosition(hornW);
+  rod.visible = hinge.visible && servo.visible;
+  rod.position.copy(hornW).add(tabW).multiplyScalar(0.5); rod.scale.set(1, hornW.distanceTo(tabW), 1);
+  rod.quaternion.setFromUnitVectors(UP, tabW.clone().sub(hornW).normalize());
+  if (now - oledAt > 250) { oledAt = now; drawOled(); }
+  const d = dist + explode * 130;
+  C.position.set(Math.sin(az) * Math.cos(el) * d, Math.sin(el) * d + 15, Math.cos(az) * Math.cos(el) * d); C.lookAt(0, 15, 0);
+  R.render(S, C);
+  const W = cv.clientWidth, H = cv.clientHeight, show = $('labels').checked && assembled();
+  for (const t of tagEls) { tmpV.copy(t.v).project(C); t.d.style.transform = `translate(${(tmpV.x + 1) / 2 * W}px, ${(1 - tmpV.y) / 2 * H}px)`; t.d.hidden = !show || (t.inner && !xrayOn); }
+  refresh();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
